@@ -111,6 +111,7 @@ databricks auth login --host https://<your-workspace>.cloud.databricks.com
 pip install build
 databricks bundle validate -t free
 databricks bundle deploy -t free
+python scripts/publish_dashboard.py -t free          # publish the dashboard draft
 databricks bundle run -t free energy_quality_job    # runs the job once
 ```
 
@@ -129,11 +130,16 @@ stays green and skips validation and deploy with a notice.
 
 ## Dashboard
 
-`src/dashboard.lvdash.json` is the dashboard **as code**: latest check results,
-a freshness counter and the 30-day price chart. It deploys with the bundle, and
-the SQL warehouse is resolved by name through a variable lookup
+`src/dashboard.lvdash.json` is the dashboard **as code**: counters (checks
+passed, hours ahead, negative hours, average price), the latest check results,
+the check history, and price and negative-hours charts. It deploys with the
+bundle, and the SQL warehouse is resolved by name through a variable lookup
 (`warehouse_id` in `databricks.yml`), so no workspace-specific ID is committed.
 `sql/quality_queries.sql` has the same queries for ad-hoc use.
+
+Bundle deploys update the dashboard *draft*; run
+`python scripts/publish_dashboard.py -t free` (or `make publish`) after a deploy
+so viewers see the new revision.
 
 ## Honesty notes
 
@@ -157,6 +163,7 @@ resources/                           pipeline, job and dashboard resources
 src/energy_quality/                  package: SMARD client, quality checks, tasks
 src/notebooks/                       Databricks notebooks (ingest, pipeline, report)
 src/dashboard.lvdash.json            dashboard definition (deployed as code)
+scripts/publish_dashboard.py         publishes the deployed dashboard draft
 tests/                               unit tests for parsers and quality rules
 sql/                                 dashboard queries
 .github/workflows/ci.yml             tests + conditional bundle validate/deploy

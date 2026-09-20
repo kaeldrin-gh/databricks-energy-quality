@@ -78,3 +78,14 @@ jobs:
             -e 's#/Workspace/Users/[^/]+#/Workspace/Users/***#g' \
             -e 's#^( *User: ).*#\1***#' \
             -e 's#https://[a-z0-9-]+\.cloud\.databricks\.com#https://***.cloud.databricks.com#g'
+
+      - name: Publish dashboard (main only)
+        if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          set -o pipefail
+          python scripts/publish_dashboard.py -t free 2>&1 | sed -E \
+            -e 's#/Workspace/Users/[^/]+#/Workspace/Users/***#g' \
+            -e 's#https://[a-z0-9-]+\.cloud\.databricks\.com#https://***.cloud.databricks.com#g'
