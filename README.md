@@ -121,8 +121,9 @@ databricks bundle deploy -t free --var="catalog=<your-catalog>"
 
 To let CI deploy for you, create a workspace token (Settings -> Developer ->
 Access tokens) and add the repository secrets `DATABRICKS_HOST` and
-`DATABRICKS_TOKEN`. Without them, CI stays green and skips validation and
-deploy with a notice.
+`DATABRICKS_TOKEN`. The workflow masks the workspace user path in its logs, so
+the public Actions tab stays free of personal details. Without the secrets, CI
+stays green and skips validation and deploy with a notice.
 
 ## Dashboard
 
