@@ -1,0 +1,12 @@
+resources:
+  pipelines:
+    prices_pipeline:
+      name: energy-quality-prices
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      continuous: false
+      channel: CURRENT
+      libraries:
+        - notebook:
+            path: ../src/notebooks/pipeline.py

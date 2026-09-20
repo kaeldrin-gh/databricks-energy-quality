@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "databricks-energy-quality"
+version = "0.1.0"
+description = "Managed-lakehouse monitoring on Databricks Free Edition: SMARD prices through Unity Catalog, Delta, Lakeflow and Declarative Automation Bundles."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.32,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "ruff>=0.6,<1",
+    "build>=1.2,<2",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Databricks notebooks rely on dbutils/spark globals and import after widget setup.
+"src/notebooks/*.py" = ["E402", "F821"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

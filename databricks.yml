@@ -1,0 +1,28 @@
+bundle:
+  name: databricks-energy-quality
+
+include:
+  - resources/*.yml
+
+# Free Edition has one workspace; keep the catalog a variable so the bundle
+# works anywhere. Find yours with `SHOW CATALOGS` in the SQL editor.
+variables:
+  catalog:
+    description: Unity Catalog catalog for the medallion tables
+    default: workspace
+  schema:
+    description: Schema for the medallion tables
+    default: energy_quality
+
+artifacts:
+  default:
+    type: whl
+    build: python -m build
+    path: .
+
+targets:
+  # Development mode prefixes resource names with the user and keeps schedules
+  # paused - the safe default for a quota-limited Free Edition workspace.
+  free:
+    default: true
+    mode: development

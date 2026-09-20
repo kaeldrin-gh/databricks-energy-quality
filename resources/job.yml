@@ -1,0 +1,36 @@
+resources:
+  jobs:
+    energy_quality_job:
+      name: energy-quality-daily
+      # Paused on purpose: Free Edition compute is quota-limited, so the
+      # schedule is opt-in (unpause it once the first run looks good).
+      schedule:
+        quartz_cron_expression: "0 30 6 * * ?"
+        timezone_id: Europe/Berlin
+        pause_status: PAUSED
+      tasks:
+        - task_key: ingest
+          notebook_task:
+            notebook_path: ../src/notebooks/ingest.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+          libraries:
+            - whl: ../dist/*.whl
+
+        - task_key: transform
+          depends_on:
+            - task_key: ingest
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.prices_pipeline.id}
+
+        - task_key: quality
+          depends_on:
+            - task_key: transform
+          notebook_task:
+            notebook_path: ../src/notebooks/quality_report.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+          libraries:
+            - whl: ../dist/*.whl
