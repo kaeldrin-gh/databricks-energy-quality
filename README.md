@@ -53,13 +53,20 @@ One Unity Catalog schema, three Delta tables plus the report:
 
 ## What it looks like
 
-The daily workflow - ingest, the Lakeflow pipeline, the quality report - and the
-pipeline lineage with the deduplicated silver output (360 hours) and the daily
-gold aggregates:
+The daily workflow and the pipeline lineage with the deduplicated silver output
+(360 hours) and daily gold aggregates:
 
 ![Job run](docs/images/job-run.png)
 
 ![Pipeline lineage](docs/images/pipeline-lineage.png)
+
+The dashboard - counters, latest checks, check history, prices and negative-price
+hours - and the quality report the first run wrote before the boundary-day fix
+(the gate failing loudly instead of passing silently):
+
+![Dashboard](docs/images/dashboard.png)
+
+![Quality report](docs/images/quality-report.png)
 
 ## What it demonstrates
 
