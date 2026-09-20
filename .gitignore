@@ -18,6 +18,9 @@ venv/
 # Databricks CLI
 .databricks/
 
+# Personal notes and career docs - never pushed
+exports/
+
 # Editors / OS
 .idea/
 .vscode/
