@@ -70,7 +70,7 @@ One Unity Catalog schema, three Delta tables plus the report:
 - **Serverless only** - no cluster configuration anywhere; the pipeline sets
   `serverless: true`.
 - **Quota-limited** - one source, three tables, one short daily job; the
-  schedule ships paused and `mode: development` keeps resource names prefixed.
+  schedule ships paused so nothing runs until you say so.
 - **No account-level APIs** - the bundle uses workspace-level resources only.
 - **Outbound internet after LinkedIn verification** - required for the SMARD
   fetch from the workspace.

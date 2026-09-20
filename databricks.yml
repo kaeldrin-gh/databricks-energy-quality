@@ -25,8 +25,7 @@ artifacts:
     path: .
 
 targets:
-  # Development mode prefixes resource names with the user and keeps schedules
-  # paused - the safe default for a quota-limited Free Edition workspace.
+  # One plain target: resource names match the repository, and the daily
+  # schedule ships paused (see resources/job.yml) for quota safety.
   free:
     default: true
-    mode: development
