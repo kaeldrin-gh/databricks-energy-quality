@@ -23,8 +23,8 @@ pipelines, workflows, bundles and CI/CD - on a workspace that costs nothing.
 
 Databricks Free Edition is free and keyless-for-the-user (no credit card), but
 constrained, and the project is built around those constraints on purpose:
-serverless compute only, quota limits, one workspace, and a single schedule
-that ships **paused** so nothing runs up a bill that cannot exist.
+serverless compute only, quota limits, one workspace, and a single small daily
+job that cannot run up a bill that does not exist.
 
 ## Architecture
 
@@ -38,7 +38,7 @@ flowchart LR
     S --> Q["Job task: quality report"]
     G --> Q
     Q --> R[("quality_report")]
-    W["Workflow (daily 06:30, paused)"] -.runs.-> I
+    W["Workflow (daily 06:30)"] -.runs.-> I
     T["Declarative Automation Bundle"] -.deploys.-> W
     C["GitHub Actions"] -.validate + deploy.-> T
 ```
@@ -80,14 +80,14 @@ hours - and the quality report the first run wrote before the boundary-day fix
 | CI/CD | GitHub Actions: tests always, bundle validate + deploy when a token exists |
 | Data-quality monitoring | freshness, bounds, uniqueness and DST-aware day checks |
 | AI/BI dashboards | `src/dashboard.lvdash.json` deployed as a bundle resource |
-| Cost awareness | serverless-only config, paused schedule, tiny quota-friendly jobs |
+| Cost awareness | serverless-only config, one small daily job, quota-friendly |
 
 ## Free Edition constraints this respects
 
 - **Serverless only** - no cluster configuration anywhere; the pipeline sets
   `serverless: true`.
-- **Quota-limited** - one source, three tables, one short daily job; the
-  schedule ships paused so nothing runs until you say so.
+- **Quota-limited** - one source, three tables, one short daily job that runs
+  once a day at 06:30 Europe/Berlin.
 - **No account-level APIs** - the bundle uses workspace-level resources only.
 - **Outbound internet after LinkedIn verification** - required for the SMARD
   fetch from the workspace.

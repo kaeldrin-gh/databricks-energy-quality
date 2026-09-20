@@ -2,12 +2,12 @@ resources:
   jobs:
     energy_quality_job:
       name: energy-quality-daily
-      # Paused on purpose: Free Edition compute is quota-limited, so the
-      # schedule is opt-in (unpause it once the first run looks good).
+      # Runs once a day; the first deploys kept it paused until the pipeline
+      # was verified end to end.
       schedule:
         quartz_cron_expression: "0 30 6 * * ?"
         timezone_id: Europe/Berlin
-        pause_status: PAUSED
+        pause_status: UNPAUSED
       # Serverless tasks take their libraries from the job environment; task
       # level `libraries` is rejected with INVALID_PARAMETER_VALUE.
       environments:
