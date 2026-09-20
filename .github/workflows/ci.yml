@@ -30,6 +30,18 @@ jobs:
 
   bundle:
     runs-on: ubuntu-latest
+    # Databricks CLI output contains the workspace user path (plain and
+    # URL-encoded), the workspace email and the workspace host; mask them all so
+    # this public log stays free of personal details.
+    env:
+      LOG_MASK: >-
+        s#/Workspace/Users/[^/]+#/Workspace/Users/***#g;
+        s#%2FWorkspace%2FUsers%2F[^%]+#%2FWorkspace%2FUsers%2F***#g;
+        s#[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+#***%40***#g;
+        s#%40[A-Za-z0-9.-]+#%40***#g;
+        s#[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}#***@***#g;
+        s#^( *User: ).*#\1***#;
+        s#https://[a-z0-9-]+\.cloud\.databricks\.com#https://***.cloud.databricks.com#g
     steps:
       - uses: actions/checkout@v7
 
@@ -60,12 +72,7 @@ jobs:
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
           set -o pipefail
-          # Mask the workspace user path (the workspace email would otherwise
-          # show up in this public log).
-          databricks bundle validate -t free 2>&1 | sed -E \
-            -e 's#/Workspace/Users/[^/]+#/Workspace/Users/***#g' \
-            -e 's#^( *User: ).*#\1***#' \
-            -e 's#https://[a-z0-9-]+\.cloud\.databricks\.com#https://***.cloud.databricks.com#g'
+          databricks bundle validate -t free 2>&1 | sed -E "$LOG_MASK"
 
       - name: Deploy bundle (main only)
         if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -75,10 +82,7 @@ jobs:
         run: |
           set -o pipefail
           pip install build
-          databricks bundle deploy -t free 2>&1 | sed -E \
-            -e 's#/Workspace/Users/[^/]+#/Workspace/Users/***#g' \
-            -e 's#^( *User: ).*#\1***#' \
-            -e 's#https://[a-z0-9-]+\.cloud\.databricks\.com#https://***.cloud.databricks.com#g'
+          databricks bundle deploy -t free 2>&1 | sed -E "$LOG_MASK"
 
       - name: Publish dashboard (main only)
         if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -87,6 +91,4 @@ jobs:
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
           set -o pipefail
-          python scripts/publish_dashboard.py -t free 2>&1 | sed -E \
-            -e 's#/Workspace/Users/[^/]+#/Workspace/Users/***#g' \
-            -e 's#https://[a-z0-9-]+\.cloud\.databricks\.com#https://***.cloud.databricks.com#g'
+          python scripts/publish_dashboard.py -t free 2>&1 | sed -E "$LOG_MASK"
