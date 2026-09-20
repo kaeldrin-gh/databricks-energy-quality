@@ -51,6 +51,16 @@ One Unity Catalog schema, three Delta tables plus the report:
 - **gold_daily** - hours, average/min/max price and negative hours per day
 - **quality_report** - every check run, appended so history is queryable
 
+## What it looks like
+
+The daily workflow - ingest, the Lakeflow pipeline, the quality report - and the
+pipeline lineage with the deduplicated silver output (360 hours) and the daily
+gold aggregates:
+
+![Job run](docs/images/job-run.png)
+
+![Pipeline lineage](docs/images/pipeline-lineage.png)
+
 ## What it demonstrates
 
 | Capability | Where |
