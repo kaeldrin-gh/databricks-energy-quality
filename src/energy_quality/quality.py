@@ -70,19 +70,40 @@ def check_unique_keys(pairs: list[tuple[str, dt.datetime]]) -> CheckResult:
     return CheckResult("unique_keys", "ok", detail, 0.0)
 
 
-def check_daily_hours(hours_per_day: list[int]) -> CheckResult:
+def select_complete_days(
+    day_hours: list[tuple[dt.date, int]],
+    latest_day: dt.date,
+) -> tuple[list[int], int]:
+    """Drop the boundary days of a rolling window.
+
+    ``day_hours`` must be sorted by day. The first day of the ingest window is
+    partial because the window starts mid-day, and the day of the newest
+    published hour is partial because day-ahead publication rolls forward, so
+    neither can be judged for completeness. Returns the hours per complete day
+    and how many boundary days were ignored.
+    """
+    if not day_hours:
+        return [], 0
+    first_day = day_hours[0][0]
+    complete = [hours for day, hours in day_hours if day != first_day and day != latest_day]
+    return complete, len(day_hours) - len(complete)
+
+
+def check_daily_hours(hours_per_day: list[int], ignored_days: int = 0) -> CheckResult:
     """A complete day has 24 hours; DST days have 23 or 25.
 
     Fewer than 23 hours means missing data and fails the run; 23/25 is expected
     twice a year and only noted in the details.
     """
     if not hours_per_day:
-        return CheckResult("daily_hours", "fail", "no days in gold_daily")
+        return CheckResult("daily_hours", "ok", "no complete days to check yet")
     dst_days = [hours for hours in hours_per_day if hours != 24]
     shortest = min(hours_per_day)
-    detail = f"{len(hours_per_day)} days, shortest {shortest}h" + (
-        f", {len(dst_days)} DST day(s)" if dst_days else ""
-    )
+    detail = f"{len(hours_per_day)} complete days, shortest {shortest}h"
+    if ignored_days:
+        detail += f", {ignored_days} boundary day(s) ignored"
+    if dst_days:
+        detail += f", {len(dst_days)} DST day(s)"
     if shortest < 23:
         return CheckResult("daily_hours", "fail", detail, float(shortest))
     return CheckResult("daily_hours", "ok", detail, float(shortest))

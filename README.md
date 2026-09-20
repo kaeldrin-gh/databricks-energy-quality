@@ -82,8 +82,9 @@ One Unity Catalog schema, three Delta tables plus the report:
 2. **transform** - the Lakeflow pipeline deduplicates bronze (newest revision
    per hour), drops rows missing keys or prices, and builds `gold_daily`.
 3. **quality** - freshness (26 h SLA), price bounds (-500..1000 EUR/MWh),
-   silver uniqueness and daily hour counts (23/24/25, DST-aware) are checked,
-   appended to `quality_report`, and any failure fails the task.
+   silver uniqueness and daily hour counts (23/24/25, DST-aware; the first and
+   last day of the rolling window are partial by construction and skipped) are
+   checked, appended to `quality_report`, and any failure fails the task.
 
 The checks live in `src/energy_quality/quality.py` as pure functions, so they
 are unit-tested without a workspace - the same pattern the other two

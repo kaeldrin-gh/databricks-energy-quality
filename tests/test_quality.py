@@ -10,6 +10,7 @@ from energy_quality.quality import (
     check_freshness,
     check_price_bounds,
     check_unique_keys,
+    select_complete_days,
 )
 from energy_quality.smard import PricePoint
 
@@ -83,6 +84,37 @@ def test_daily_hours_handles_dst_days():
     assert "DST" in result.detail
     # A short day means missing data.
     assert check_daily_hours([24, 20]).status == "fail"
+    # Nothing to judge yet is not a failure.
+    assert check_daily_hours([]).status == "ok"
+
+
+def test_select_complete_days_ignores_window_boundaries():
+    day_hours = [
+        (dt.date(2026, 9, 1), 2),  # window starts mid-day
+        (dt.date(2026, 9, 2), 24),
+        (dt.date(2026, 9, 3), 24),
+        (dt.date(2026, 9, 4), 2),  # newest published hour, still rolling
+    ]
+
+    complete, ignored = select_complete_days(day_hours, latest_day=dt.date(2026, 9, 4))
+
+    assert complete == [24, 24]
+    assert ignored == 2
+
+
+def test_select_complete_days_with_missing_middle_day_fails_check():
+    day_hours = [
+        (dt.date(2026, 9, 1), 5),
+        (dt.date(2026, 9, 2), 24),
+        (dt.date(2026, 9, 3), 10),  # missing hours -> must be caught
+        (dt.date(2026, 9, 4), 1),
+    ]
+
+    complete, ignored = select_complete_days(day_hours, latest_day=dt.date(2026, 9, 4))
+    result = check_daily_hours(complete, ignored)
+
+    assert result.status == "fail"
+    assert "shortest 10h" in result.detail
 
 
 def test_checks_report_metric_values():

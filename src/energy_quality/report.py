@@ -15,6 +15,7 @@ from energy_quality.quality import (
     check_freshness,
     check_price_bounds,
     check_unique_keys,
+    select_complete_days,
 )
 
 REPORT_SCHEMA = (
@@ -40,14 +41,19 @@ def run_quality_report(
     ).collect()
     key_rows = spark.sql(f"select region, delivery_ts from {fq}.silver_prices").collect()
     day_rows = spark.sql(
-        f"select hours from {fq}.gold_daily where day >= current_date() - interval 30 days"
+        f"select day, hours from {fq}.gold_daily "
+        "where day >= current_date() - interval 30 days order by day"
     ).collect()
+
+    day_hours = [(row["day"], int(row["hours"])) for row in day_rows]
+    latest_day = latest.date() if latest is not None else dt.date.today()
+    complete_hours, ignored_days = select_complete_days(day_hours, latest_day)
 
     results = [
         check_freshness(latest, now),
         check_price_bounds([row["price_eur_mwh"] for row in price_rows]),
         check_unique_keys([(row["region"], row["delivery_ts"]) for row in key_rows]),
-        check_daily_hours([row["hours"] for row in day_rows]),
+        check_daily_hours(complete_hours, ignored_days),
     ]
 
     checked_at = now.replace(tzinfo=None)
