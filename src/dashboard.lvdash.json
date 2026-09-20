@@ -3,30 +3,27 @@
     {
       "name": "ds_checks",
       "displayName": "Latest quality checks",
-      "queryLines": [
-        "SELECT check_name, status, detail, checked_at\n",
-        "FROM workspace.energy_quality.quality_report\n",
-        "WHERE checked_at = (SELECT max(checked_at) FROM workspace.energy_quality.quality_report)\n",
-        "ORDER BY check_name"
-      ]
+      "query": "SELECT check_name, status, detail, checked_at\nFROM workspace.energy_quality.quality_report\nWHERE checked_at = (SELECT max(checked_at) FROM workspace.energy_quality.quality_report)\nORDER BY check_name"
+    },
+    {
+      "name": "ds_history",
+      "displayName": "Check history",
+      "query": "SELECT checked_at, check_name, status\nFROM workspace.energy_quality.quality_report\nORDER BY checked_at DESC\nLIMIT 40"
     },
     {
       "name": "ds_freshness",
       "displayName": "Freshness",
-      "queryLines": [
-        "SELECT round((unix_timestamp(max(delivery_ts)) - unix_timestamp(current_timestamp())) / 3600, 1) AS hours_ahead\n",
-        "FROM workspace.energy_quality.silver_prices"
-      ]
+      "query": "SELECT round((unix_timestamp(max(delivery_ts)) - unix_timestamp(current_timestamp())) / 3600, 1) AS hours_ahead\nFROM workspace.energy_quality.silver_prices"
+    },
+    {
+      "name": "ds_summary",
+      "displayName": "Summary",
+      "query": "SELECT\n  (SELECT count(*) FROM workspace.energy_quality.quality_report\n   WHERE checked_at = (SELECT max(checked_at) FROM workspace.energy_quality.quality_report)\n     AND status = 'ok') AS checks_ok,\n  (SELECT sum(negative_hours) FROM workspace.energy_quality.gold_daily\n   WHERE day >= current_date() - INTERVAL 30 DAYS) AS negative_hours_30d,\n  (SELECT round(avg(avg_price_eur_mwh), 1) FROM workspace.energy_quality.gold_daily\n   WHERE day >= current_date() - INTERVAL 30 DAYS) AS avg_price_30d"
     },
     {
       "name": "ds_daily",
       "displayName": "Daily prices",
-      "queryLines": [
-        "SELECT day, avg_price_eur_mwh, negative_hours\n",
-        "FROM workspace.energy_quality.gold_daily\n",
-        "WHERE day >= current_date() - INTERVAL 30 DAYS\n",
-        "ORDER BY day"
-      ]
+      "query": "SELECT day, avg_price_eur_mwh, negative_hours\nFROM workspace.energy_quality.gold_daily\nWHERE day >= current_date() - INTERVAL 30 DAYS\nORDER BY day"
     }
   ],
   "pages": [
@@ -35,6 +32,172 @@
       "displayName": "Energy quality",
       "layout": [
         {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          },
+          "widget": {
+            "name": "widget_checks_ok",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_summary",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`checks_ok`",
+                      "name": "checks_ok"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Checks passed (latest run)"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "checks_ok",
+                  "displayName": "checks_ok"
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          },
+          "widget": {
+            "name": "widget_freshness",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_freshness",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`hours_ahead`",
+                      "name": "hours_ahead"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Newest delivery hour (hours ahead)"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "hours_ahead",
+                  "displayName": "hours_ahead"
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          },
+          "widget": {
+            "name": "widget_negative",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_summary",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`negative_hours_30d`",
+                      "name": "negative_hours_30d"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Negative-price hours (30 days)"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "negative_hours_30d",
+                  "displayName": "negative_hours_30d"
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          },
+          "widget": {
+            "name": "widget_avg_price",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_summary",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`avg_price_30d`",
+                      "name": "avg_price_30d"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Average price EUR/MWh (30 days)"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_price_30d",
+                  "displayName": "avg_price_30d"
+                }
+              }
+            }
+          }
+        },
+        {
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 4
+          },
           "widget": {
             "name": "widget_checks",
             "queries": [
@@ -42,25 +205,25 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_checks",
+                  "disaggregated": true,
                   "fields": [
                     {
-                      "name": "check_name",
-                      "expression": "`check_name`"
+                      "expression": "`check_name`",
+                      "name": "check_name"
                     },
                     {
-                      "name": "status",
-                      "expression": "`status`"
+                      "expression": "`status`",
+                      "name": "status"
                     },
                     {
-                      "name": "detail",
-                      "expression": "`detail`"
+                      "expression": "`detail`",
+                      "name": "detail"
                     },
                     {
-                      "name": "checked_at",
-                      "expression": "`checked_at`"
+                      "expression": "`checked_at`",
+                      "name": "checked_at"
                     }
-                  ],
-                  "disaggregated": true
+                  ]
                 }
               }
             ],
@@ -75,7 +238,7 @@
                 "columns": [
                   {
                     "fieldName": "check_name",
-                    "displayName": "check_name",
+                    "displayName": "check",
                     "type": "string",
                     "displayAs": "string",
                     "visible": true
@@ -96,7 +259,7 @@
                   },
                   {
                     "fieldName": "checked_at",
-                    "displayName": "checked_at",
+                    "displayName": "checked at",
                     "type": "datetime",
                     "displayAs": "datetime",
                     "visible": true
@@ -104,55 +267,82 @@
                 ]
               }
             }
-          },
-          "position": {
-            "x": 0,
-            "y": 0,
-            "width": 6,
-            "height": 6
           }
         },
         {
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 4
+          },
           "widget": {
-            "name": "widget_freshness",
+            "name": "widget_history",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_freshness",
+                  "datasetName": "ds_history",
+                  "disaggregated": true,
                   "fields": [
                     {
-                      "name": "hours_ahead",
-                      "expression": "`hours_ahead`"
+                      "expression": "`checked_at`",
+                      "name": "checked_at"
+                    },
+                    {
+                      "expression": "`check_name`",
+                      "name": "check_name"
+                    },
+                    {
+                      "expression": "`status`",
+                      "name": "status"
                     }
-                  ],
-                  "disaggregated": false
+                  ]
                 }
               }
             ],
             "spec": {
               "version": 2,
-              "widgetType": "counter",
+              "widgetType": "table",
               "frame": {
                 "showTitle": true,
-                "title": "Newest delivery hour (hours ahead)"
+                "title": "Check history (last 40 rows)"
               },
               "encodings": {
-                "value": {
-                  "fieldName": "hours_ahead",
-                  "displayName": "hours_ahead"
-                }
+                "columns": [
+                  {
+                    "fieldName": "checked_at",
+                    "displayName": "checked at",
+                    "type": "datetime",
+                    "displayAs": "datetime",
+                    "visible": true
+                  },
+                  {
+                    "fieldName": "check_name",
+                    "displayName": "check",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true
+                  },
+                  {
+                    "fieldName": "status",
+                    "displayName": "status",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true
+                  }
+                ]
               }
             }
-          },
-          "position": {
-            "x": 6,
-            "y": 0,
-            "width": 6,
-            "height": 2
           }
         },
         {
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 4
+          },
           "widget": {
             "name": "widget_daily",
             "queries": [
@@ -160,17 +350,17 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_daily",
+                  "disaggregated": false,
                   "fields": [
                     {
-                      "name": "avg_price_eur_mwh",
-                      "expression": "`avg_price_eur_mwh`"
+                      "expression": "`avg_price_eur_mwh`",
+                      "name": "avg_price_eur_mwh"
                     },
                     {
-                      "name": "day",
-                      "expression": "`day`"
+                      "expression": "`day`",
+                      "name": "day"
                     }
-                  ],
-                  "disaggregated": false
+                  ]
                 }
               }
             ],
@@ -209,16 +399,74 @@
                 }
               }
             }
-          },
+          }
+        },
+        {
           "position": {
             "x": 6,
-            "y": 2,
+            "y": 6,
             "width": 6,
             "height": 4
+          },
+          "widget": {
+            "name": "widget_negative_daily",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_daily",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`negative_hours`",
+                      "name": "negative_hours"
+                    },
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "frame": {
+                "showTitle": true,
+                "title": "Negative-price hours per day (last 30 days)"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D"
+                ]
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "title": "Day"
+                  }
+                },
+                "y": {
+                  "fieldName": "negative_hours",
+                  "displayName": "negative_hours",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Hours"
+                  }
+                }
+              }
+            }
           }
         }
-      ],
-      "pageType": "PAGE_TYPE_CANVAS"
+      ]
     }
   ]
 }
