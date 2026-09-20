@@ -140,10 +140,12 @@ databricks bundle deploy -t free --var="catalog=<your-catalog>"
 ```
 
 To let CI deploy for you, create a workspace token (Settings -> Developer ->
-Access tokens) and add the repository secrets `DATABRICKS_HOST` and
-`DATABRICKS_TOKEN`. The workflow masks the workspace user path in its logs, so
-the public Actions tab stays free of personal details. Without the secrets, CI
-stays green and skips validation and deploy with a notice.
+Access tokens) with the **All APIs** scope, then add the repository secrets
+`DATABRICKS_HOST` and `DATABRICKS_TOKEN`. Pushes to `main` and manual
+`workflow_dispatch` runs then validate, deploy and publish the dashboard. The
+workflow masks the workspace user path, the email and the workspace host in its
+logs, so the public Actions tab stays free of personal details. Without the
+secrets, CI stays green and skips validation and deploy with a notice.
 
 ## Dashboard
 
