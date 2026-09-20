@@ -8,15 +8,21 @@ resources:
         quartz_cron_expression: "0 30 6 * * ?"
         timezone_id: Europe/Berlin
         pause_status: PAUSED
+      # Serverless tasks take their libraries from the job environment; task
+      # level `libraries` is rejected with INVALID_PARAMETER_VALUE.
+      environments:
+        - environment_key: default
+          spec:
+            dependencies:
+              - dist/*.whl
       tasks:
         - task_key: ingest
+          environment_key: default
           notebook_task:
             notebook_path: ../src/notebooks/ingest.py
             base_parameters:
               catalog: ${var.catalog}
               schema: ${var.schema}
-          libraries:
-            - whl: ../dist/*.whl
 
         - task_key: transform
           depends_on:
@@ -25,6 +31,7 @@ resources:
             pipeline_id: ${resources.pipelines.prices_pipeline.id}
 
         - task_key: quality
+          environment_key: default
           depends_on:
             - task_key: transform
           notebook_task:
@@ -32,5 +39,3 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               schema: ${var.schema}
-          libraries:
-            - whl: ../dist/*.whl
