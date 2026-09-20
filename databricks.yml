@@ -13,6 +13,10 @@ variables:
   schema:
     description: Schema for the medallion tables
     default: energy_quality
+  warehouse_id:
+    description: SQL warehouse used by the dashboard (resolved by name at deploy)
+    lookup:
+      warehouse: Serverless Starter Warehouse
 
 artifacts:
   default:

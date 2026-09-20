@@ -62,6 +62,7 @@ One Unity Catalog schema, three Delta tables plus the report:
 | Declarative Automation Bundles | `databricks.yml` + `resources/`, wheel artifact |
 | CI/CD | GitHub Actions: tests always, bundle validate + deploy when a token exists |
 | Data-quality monitoring | freshness, bounds, uniqueness and DST-aware day checks |
+| AI/BI dashboards | `src/dashboard.lvdash.json` deployed as a bundle resource |
 | Cost awareness | serverless-only config, paused schedule, tiny quota-friendly jobs |
 
 ## Free Edition constraints this respects
@@ -128,9 +129,11 @@ stays green and skips validation and deploy with a notice.
 
 ## Dashboard
 
-`sql/quality_queries.sql` has the queries behind the dashboard: latest check
-results, check history, freshness in hours, 30-day prices and the uniqueness
-invariant. Create them in the SQL editor and pin them to a dashboard.
+`src/dashboard.lvdash.json` is the dashboard **as code**: latest check results,
+a freshness counter and the 30-day price chart. It deploys with the bundle, and
+the SQL warehouse is resolved by name through a variable lookup
+(`warehouse_id` in `databricks.yml`), so no workspace-specific ID is committed.
+`sql/quality_queries.sql` has the same queries for ad-hoc use.
 
 ## Honesty notes
 
@@ -150,9 +153,10 @@ invariant. Create them in the SQL editor and pin them to a dashboard.
 
 ```
 databricks.yml                       bundle definition (variables, wheel, target)
-resources/                           pipeline and job resources
+resources/                           pipeline, job and dashboard resources
 src/energy_quality/                  package: SMARD client, quality checks, tasks
 src/notebooks/                       Databricks notebooks (ingest, pipeline, report)
+src/dashboard.lvdash.json            dashboard definition (deployed as code)
 tests/                               unit tests for parsers and quality rules
 sql/                                 dashboard queries
 .github/workflows/ci.yml             tests + conditional bundle validate/deploy

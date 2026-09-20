@@ -1,0 +1,6 @@
+resources:
+  dashboards:
+    energy_quality_dashboard:
+      display_name: energy-quality
+      file_path: ../src/dashboard.lvdash.json
+      warehouse_id: ${var.warehouse_id}
