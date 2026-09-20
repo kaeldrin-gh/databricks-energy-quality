@@ -64,6 +64,20 @@ def test_freshness_treats_naive_timestamps_as_utc():
     assert result.metric == 3.0
 
 
+def test_freshness_accepts_day_ahead_future_hours():
+    result = check_freshness(NOW + dt.timedelta(hours=26), NOW)
+
+    assert result.status == "ok"
+    assert "in the future" in result.detail
+    assert result.metric == -26.0
+
+
+def test_freshness_fails_implausibly_far_future_hours():
+    result = check_freshness(NOW + dt.timedelta(hours=48), NOW)
+
+    assert result.status == "fail"
+
+
 def test_price_bounds_pass_and_fail():
     assert check_price_bounds([12.0, -30.0, 400.0]).status == "ok"
     assert check_price_bounds([12.0, 120000.0]).status == "fail"

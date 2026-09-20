@@ -15,6 +15,8 @@ PRICE_LOW = -500.0
 PRICE_HIGH = 1000.0
 # Freshness SLA: the newest delivery hour may be at most this old.
 FRESHNESS_SLA_HOURS = 26.0
+# Day-ahead hours are published ahead of delivery; more than this is a glitch.
+MAX_AHEAD_HOURS = 36.0
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,7 @@ def check_freshness(
     latest_delivery: dt.datetime | None,
     now: dt.datetime,
     sla_hours: float = FRESHNESS_SLA_HOURS,
+    max_ahead_hours: float = MAX_AHEAD_HOURS,
 ) -> CheckResult:
     if latest_delivery is None:
         return CheckResult("freshness", "fail", "no delivery hours in silver_prices")
@@ -37,6 +40,16 @@ def check_freshness(
     else:
         actual = latest_delivery
     age_hours = (now.astimezone(dt.timezone.utc) - actual).total_seconds() / 3600
+    if age_hours < 0:
+        # Day-ahead prices are published before delivery, so the newest hour is
+        # normally in the future; only an implausible jump is a failure.
+        detail = (
+            f"latest delivery hour is {-age_hours:.1f}h in the future "
+            f"(day-ahead publication, max {max_ahead_hours:.0f}h)"
+        )
+        if -age_hours > max_ahead_hours:
+            return CheckResult("freshness", "fail", detail, round(age_hours, 2))
+        return CheckResult("freshness", "ok", detail, round(age_hours, 2))
     detail = f"latest delivery hour is {age_hours:.1f}h old (SLA {sla_hours:.0f}h)"
     if age_hours <= sla_hours:
         return CheckResult("freshness", "ok", detail, round(age_hours, 2))
