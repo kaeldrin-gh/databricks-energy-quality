@@ -75,7 +75,7 @@ jobs:
           databricks bundle validate -t free 2>&1 | sed -E "$LOG_MASK"
 
       - name: Deploy bundle (main only)
-        if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
           databricks bundle deploy -t free 2>&1 | sed -E "$LOG_MASK"
 
       - name: Publish dashboard (main only)
-        if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
