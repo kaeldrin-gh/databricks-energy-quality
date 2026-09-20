@@ -13,8 +13,9 @@ resources:
       environments:
         - environment_key: default
           spec:
+            environment_version: "5"
             dependencies:
-              - dist/*.whl
+              - ../dist/*.whl
       tasks:
         - task_key: ingest
           environment_key: default

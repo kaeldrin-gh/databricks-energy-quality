@@ -137,11 +137,12 @@ invariant. Create them in the SQL editor and pin them to a dashboard.
   quotas are exceeded.
 - The workspace is private, so there is no public live link - reviewers can
   sign up for Free Edition (free) and deploy the bundle themselves.
-- First deploys on a fresh workspace can surface serverless-specific tweaks;
-  `databricks bundle validate` plus the workspace UI show exactly what to fix.
-  One that this repository hit and documents: serverless job tasks reject
-  task-level `libraries`; the wheel belongs in the job environment
-  (`environments[].spec.dependencies`).
+- First deploys on a fresh workspace can surface serverless-specific tweaks,
+  and the bundle now encodes the three this repository hit: serverless job
+  tasks reject task-level `libraries` (the wheel belongs in the job
+  environment), that environment requires an `environment_version`, and paths
+  in `environments[].spec.dependencies` resolve relative to the resource file
+  (`../dist/*.whl`), not the bundle root.
 
 ## Layout
 
