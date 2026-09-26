@@ -108,6 +108,12 @@ The checks live in `src/energy_quality/quality.py` as pure functions, so they
 are unit-tested without a workspace - the same pattern the other two
 repositories use for their correctness rules.
 
+No notification channel is configured: a failing check fails the task and the
+run, the dashboard's history tile shows the red row, and `quality_report` keeps
+the evidence queryable. If you want mail or webhooks later, the job's
+notification settings in the workspace UI can be added without touching the
+bundle.
+
 ## Quickstart (local)
 
 ```bash
