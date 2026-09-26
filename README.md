@@ -169,8 +169,11 @@ so viewers see the new revision.
 ## Honesty notes
 
 - This is a **prototype on Databricks Free Edition** (personal use), not a
-  production deployment; the free tier has no SLA and pauses compute when
-  quotas are exceeded.
+  production deployment. The free tier enforces a fair-usage quota: when it is
+  exceeded, compute is disabled for the rest of the day (occasionally longer),
+  so a scheduled run can be skipped. The pipeline is built for that - the
+  ingest window is three weekly chunks and silver keeps the newest revision, so
+  the next successful run recovers the gap without a manual backfill.
 - The workspace is private, so there is no public live link - reviewers can
   sign up for Free Edition (free) and deploy the bundle themselves.
 - First deploys on a fresh workspace can surface serverless-specific tweaks,
