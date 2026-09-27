@@ -8,6 +8,8 @@ German day-ahead prices land in Delta, are deduplicated by a Lakeflow pipeline
 with quality expectations, and are monitored by a daily workflow that writes a
 quality report and fails when the data stops being trustworthy.
 
+**Stack:** Python · PySpark · Databricks Free Edition (Unity Catalog, Delta, Lakeflow, Workflows, Bundles) · GitHub Actions
+
 Companion projects:
 [de-energy-streaming](https://github.com/kaeldrin-gh/de-energy-streaming)
 (self-hosted streaming lakehouse) and
@@ -18,7 +20,7 @@ Companion projects:
 
 The other two repositories prove streaming and analytics engineering on a
 local, self-hosted stack. This one is deliberately different: it shows the
-**managed-platform** side of the job - Unity Catalog, Delta, lakeflow
+**managed-platform** side of the job - Unity Catalog, Delta, Lakeflow
 pipelines, workflows, bundles and CI/CD - on a workspace that costs nothing.
 
 Databricks Free Edition is free and keyless-for-the-user (no credit card), but
@@ -75,7 +77,7 @@ hours - and the quality report the first run wrote before the boundary-day fix
 | Unity Catalog | `catalog.schema.table` naming, variables in the bundle |
 | Delta Lake | append landing, dedupe, aggregates, report history |
 | Lakeflow Spark Declarative Pipelines | `src/notebooks/pipeline.py` with expectations |
-| Workflows / Jobs | three tasks with dependencies, retry-friendly schedule |
+| Workflows / Jobs | three tasks with dependencies; the SMARD ingest retries twice, 10 min apart |
 | Declarative Automation Bundles | `databricks.yml` + `resources/`, wheel artifact |
 | CI/CD | GitHub Actions: tests always, bundle validate + deploy when a token exists |
 | Data-quality monitoring | freshness, bounds, uniqueness and DST-aware day checks |
@@ -96,7 +98,8 @@ hours - and the quality report the first run wrote before the boundary-day fix
 ## The daily job
 
 1. **ingest** - the wheel's SMARD client fetches the recent weekly chunks and
-   appends the published hours to `bronze_prices`.
+   appends the published hours to `bronze_prices`. A failed fetch is retried
+   twice, ten minutes apart, before the run fails.
 2. **transform** - the Lakeflow pipeline deduplicates bronze (newest revision
    per hour), drops rows missing keys or prices, and builds `gold_daily`.
 3. **quality** - freshness (26 h SLA), price bounds (-500..1000 EUR/MWh),
