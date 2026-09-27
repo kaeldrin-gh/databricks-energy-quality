@@ -91,8 +91,6 @@ hours - and the quality report the first run wrote before the boundary-day fix
 - **Quota-limited** - one source, three tables, one short daily job that runs
   once a day at 06:30 Europe/Berlin.
 - **No account-level APIs** - the bundle uses workspace-level resources only.
-- **Outbound internet after LinkedIn verification** - required for the SMARD
-  fetch from the workspace.
 - **Personal, non-commercial use** - this is an openly documented prototype.
 
 ## The daily job
