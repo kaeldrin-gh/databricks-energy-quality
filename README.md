@@ -16,6 +16,15 @@ Companion projects:
 [nl-energy-warehouse](https://github.com/kaeldrin-gh/nl-energy-warehouse)
 (dbt analytics engineering).
 
+## Where to look first
+
+| If you have | Read |
+| --- | --- |
+| 2 minutes | The architecture and the four screenshots below (the workspace is private, so there is no live link) |
+| 10 minutes | [src/energy_quality/quality.py](src/energy_quality/quality.py) (the checks as pure functions) with [tests/test_quality.py](tests/test_quality.py), and the pipeline expectations in [src/notebooks/pipeline.py](src/notebooks/pipeline.py) |
+| The platform side | [databricks.yml](databricks.yml) and [resources/job.yml](resources/job.yml) (the bundle and the three-task job) and [.github/workflows/ci.yml](.github/workflows/ci.yml) (test, validate, deploy, publish) |
+| The trade-offs | The Free Edition constraints and honesty notes further down |
+
 ## Why this project exists
 
 The other two repositories prove streaming and analytics engineering on a
