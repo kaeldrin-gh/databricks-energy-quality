@@ -25,7 +25,7 @@ artifacts:
     path: .
 
 targets:
-  # One plain target: resource names match the repository, and the daily
-  # schedule ships paused (see resources/job.yml) for quota safety.
+  # One plain target: resource names match the repository; the job runs once
+  # a day at 06:30 Europe/Berlin (see resources/job.yml) to stay within quota.
   free:
     default: true
