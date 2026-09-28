@@ -23,7 +23,7 @@ Companion projects:
 | 2 minutes | The architecture and the four screenshots below (the workspace is private, so there is no live link) |
 | 10 minutes | [src/energy_quality/quality.py](src/energy_quality/quality.py) (the checks as pure functions) with [tests/test_quality.py](tests/test_quality.py), and the pipeline expectations in [src/notebooks/pipeline.py](src/notebooks/pipeline.py) |
 | The platform side | [databricks.yml](databricks.yml) and [resources/job.yml](resources/job.yml) (the bundle and the three-task job) and [.github/workflows/ci.yml](.github/workflows/ci.yml) (test, validate, deploy, publish) |
-| The trade-offs | The Free Edition constraints and honesty notes further down |
+| The trade-offs | The Free Edition constraints and known limitations further down |
 
 ## Why this project exists
 
@@ -32,8 +32,8 @@ local, self-hosted stack. This one is deliberately different: it shows the
 **managed-platform** side of the job - Unity Catalog, Delta, Lakeflow
 pipelines, workflows, bundles and CI/CD - on a workspace that costs nothing.
 
-Databricks Free Edition is free and keyless-for-the-user (no credit card), but
-constrained, and the project is built around those constraints on purpose:
+Databricks Free Edition needs no credit card, but it is constrained, and the
+project is built around those constraints on purpose:
 serverless compute only, quota limits, one workspace, and a single small daily
 job that cannot run up a bill that does not exist.
 
@@ -120,15 +120,14 @@ repositories use for their correctness rules.
 
 No notification channel is configured: a failing check fails the task and the
 run, the dashboard's history tile shows the red row, and `quality_report` keeps
-the evidence queryable. If you want mail or webhooks later, the job's
-notification settings in the workspace UI can be added without touching the
-bundle.
+the evidence queryable. A notification destination can be added in the job's
+settings later without touching the bundle.
 
 ## Quickstart (local)
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate        # Windows; use source .venv/bin/activate elsewhere
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
 python -m pytest -q           # unit tests, no workspace or network
@@ -176,7 +175,7 @@ Bundle deploys update the dashboard *draft*; run
 `python scripts/publish_dashboard.py -t free` (or `make publish`) after a deploy
 so viewers see the new revision.
 
-## Honesty notes
+## Known limitations
 
 - This is a **prototype on Databricks Free Edition** (personal use), not a
   production deployment. The free tier enforces a fair-usage quota: when it is
