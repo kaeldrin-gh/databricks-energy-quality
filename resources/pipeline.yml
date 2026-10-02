@@ -7,6 +7,8 @@ resources:
       serverless: true
       continuous: false
       channel: CURRENT
+      configuration:
+        landing_path: /Volumes/${var.catalog}/${var.schema}/landing/smard
       libraries:
         - notebook:
             path: ../src/notebooks/pipeline.py

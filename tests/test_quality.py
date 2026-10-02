@@ -1,10 +1,12 @@
-"""Unit tests for the quality checks and the bronze row mapping."""
+"""Unit tests for the quality checks and the landing files the ingest task writes."""
 
 from __future__ import annotations
 
 import datetime as dt
+import json
 
-from energy_quality.ingest import collect_rows, run_ingest
+from energy_quality import ingest
+from energy_quality.ingest import collect_rows, file_name, run_ingest, to_json_lines
 from energy_quality.quality import (
     check_daily_hours,
     check_freshness,
@@ -30,23 +32,51 @@ def test_collect_rows_shapes_bronze_rows_without_spark():
     ]
 
 
-def test_run_ingest_rejects_empty_fetch(monkeypatch):
+def test_run_ingest_rejects_empty_fetch(monkeypatch, tmp_path):
     class EmptyClient:
         def fetch_latest(self, weeks: int = 3) -> list[PricePoint]:
             return []
 
     monkeypatch.setattr("energy_quality.ingest.build_client", lambda: EmptyClient())
-
-    class FakeSpark:
-        def sql(self, query: str) -> None:
-            raise AssertionError("must not touch Spark when there is nothing to write")
+    monkeypatch.setattr(ingest, "landing_path", lambda catalog, schema: str(tmp_path))
 
     try:
-        run_ingest(FakeSpark(), "workspace", "energy_quality")
+        run_ingest("workspace", "energy_quality")
     except RuntimeError as error:
         assert "no published points" in str(error)
     else:  # pragma: no cover - defensive
         raise AssertionError("expected RuntimeError")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_json_lines_carry_utc_timestamps_auto_loader_can_parse():
+    rows = collect_rows(FakeClient(), now=NOW)
+
+    (line,) = to_json_lines(rows).splitlines()
+
+    assert json.loads(line) == {
+        "region": "DE-LU",
+        "delivery_ts": "2026-09-19T10:00:00.000Z",
+        "price_eur_mwh": 42.0,
+        "source": "smard",
+        "fetched_at": "2026-09-20T06:00:00.000Z",
+    }
+
+
+def test_run_ingest_lands_one_file_per_run_and_no_partial_file(monkeypatch, tmp_path):
+    monkeypatch.setattr("energy_quality.ingest.build_client", lambda: FakeClient())
+    monkeypatch.setattr(ingest, "landing_path", lambda catalog, schema: str(tmp_path))
+    monkeypatch.setattr(
+        ingest,
+        "collect_rows",
+        lambda client, weeks=3: collect_rows(client, weeks=weeks, now=NOW),
+    )
+
+    path = run_ingest("workspace", "energy_quality")
+
+    assert path.endswith(file_name(dt.datetime(2026, 9, 20, 6)))
+    assert [f.name for f in tmp_path.iterdir()] == ["smard_20260920T060000Z.jsonl"]
+    assert len((tmp_path / "smard_20260920T060000Z.jsonl").read_text().splitlines()) == 1
 
 
 def test_freshness_ok_and_fail():

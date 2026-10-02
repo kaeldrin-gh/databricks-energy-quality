@@ -1,10 +1,11 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Ingest published SMARD day-ahead prices into bronze
+# MAGIC # Land published SMARD day-ahead prices in the landing volume
 # MAGIC
-# MAGIC Append-only landing; revisions are deduplicated in the pipeline's
-# MAGIC `silver_prices` table (newest `fetched_at` wins), so re-running this task
-# MAGIC is always safe.
+# MAGIC Writes one JSON-lines file per run to
+# MAGIC `/Volumes/<catalog>/<schema>/landing/smard/`. The pipeline ingests new
+# MAGIC files with Auto Loader into `bronze_prices`, and AUTO CDC keeps the newest
+# MAGIC revision per hour in `silver_prices_latest`, so re-running this task is always safe.
 
 # COMMAND ----------
 
@@ -16,10 +17,9 @@ dbutils.widgets.text("weeks", "3")
 
 from energy_quality.ingest import run_ingest  # noqa: E402
 
-count = run_ingest(
-    spark,
+path = run_ingest(
     dbutils.widgets.get("catalog"),
     dbutils.widgets.get("schema"),
     weeks=int(dbutils.widgets.get("weeks")),
 )
-print(f"ingested {count} published hours into bronze_prices")
+print(f"landed {path}")

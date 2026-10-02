@@ -32,14 +32,14 @@ def run_quality_report(
     now = now or dt.datetime.now(dt.timezone.utc)
     fq = f"{catalog}.{schema}"
 
-    latest = spark.sql(f"select max(delivery_ts) as latest from {fq}.silver_prices").collect()[0][
-        "latest"
-    ]
+    latest = spark.sql(
+        f"select max(delivery_ts) as latest from {fq}.silver_prices_latest"
+    ).collect()[0]["latest"]
     price_rows = spark.sql(
-        f"select price_eur_mwh from {fq}.silver_prices "
+        f"select price_eur_mwh from {fq}.silver_prices_latest "
         "where delivery_ts >= current_timestamp() - interval 30 days"
     ).collect()
-    key_rows = spark.sql(f"select region, delivery_ts from {fq}.silver_prices").collect()
+    key_rows = spark.sql(f"select region, delivery_ts from {fq}.silver_prices_latest").collect()
     day_rows = spark.sql(
         f"select day, hours from {fq}.gold_daily "
         "where day >= current_date() - interval 30 days order by day"

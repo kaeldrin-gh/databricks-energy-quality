@@ -34,7 +34,7 @@ def check_freshness(
     max_ahead_hours: float = MAX_AHEAD_HOURS,
 ) -> CheckResult:
     if latest_delivery is None:
-        return CheckResult("freshness", "fail", "no delivery hours in silver_prices")
+        return CheckResult("freshness", "fail", "no delivery hours in silver_prices_latest")
     if latest_delivery.tzinfo is None:
         actual = latest_delivery.replace(tzinfo=dt.timezone.utc)
     else:

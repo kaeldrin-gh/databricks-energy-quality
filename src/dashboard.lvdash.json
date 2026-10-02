@@ -13,7 +13,7 @@
     {
       "name": "ds_freshness",
       "displayName": "Freshness",
-      "query": "SELECT round((unix_timestamp(max(delivery_ts)) - unix_timestamp(current_timestamp())) / 3600, 1) AS hours_ahead\nFROM workspace.energy_quality.silver_prices"
+      "query": "SELECT round((unix_timestamp(max(delivery_ts)) - unix_timestamp(current_timestamp())) / 3600, 1) AS hours_ahead\nFROM workspace.energy_quality.silver_prices_latest"
     },
     {
       "name": "ds_summary",

@@ -16,7 +16,7 @@ LIMIT 120;
 -- 3) Freshness in hours (should stay under the 26h SLA)
 SELECT round((unix_timestamp(current_timestamp()) - unix_timestamp(max(delivery_ts))) / 3600, 1)
        AS age_hours
-FROM ${catalog}.${schema}.silver_prices;
+FROM ${catalog}.${schema}.silver_prices_latest;
 
 -- 4) Daily prices with negative-hour flags
 SELECT day, hours, avg_price_eur_mwh, min_price_eur_mwh, max_price_eur_mwh, negative_hours
@@ -26,7 +26,7 @@ ORDER BY day DESC;
 
 -- 5) Silver uniqueness invariant: expect zero rows
 SELECT region, delivery_ts, count(*) AS n
-FROM ${catalog}.${schema}.silver_prices
+FROM ${catalog}.${schema}.silver_prices_latest
 GROUP BY region, delivery_ts
 HAVING count(*) > 1
 LIMIT 20;

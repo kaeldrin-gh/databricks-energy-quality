@@ -4,10 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A managed-lakehouse data-engineering project on **Databricks Free Edition**:
-German day-ahead prices flow through a bronze/silver/gold medallion in Delta,
-are deduplicated by a Lakeflow pipeline (formerly Delta Live Tables) with
-quality expectations, and are monitored by a daily workflow that writes a
-quality report and fails when the data stops being trustworthy.
+German day-ahead prices land as files in a Unity Catalog Volume, flow through a
+bronze/silver/gold medallion in a Lakeflow pipeline (formerly Delta Live
+Tables) with Auto Loader, AUTO CDC and quality expectations, and are monitored
+by a daily workflow that writes a quality report and fails when the data stops
+being trustworthy.
 
 **Stack:** Python · PySpark · Databricks Free Edition (Unity Catalog, Delta Lake, Lakeflow pipelines / DLT, Workflows / Jobs, Asset Bundles) · GitHub Actions
 
@@ -24,7 +25,7 @@ Companion projects:
 | If you have | Read |
 | --- | --- |
 | 2 minutes | The architecture and the four screenshots below (the workspace is private, so there is no live link) |
-| 10 minutes | [src/energy_quality/quality.py](src/energy_quality/quality.py) (the checks as pure functions) with [tests/test_quality.py](tests/test_quality.py), and the pipeline expectations in [src/notebooks/pipeline.py](src/notebooks/pipeline.py) |
+| 10 minutes | [src/notebooks/pipeline.py](src/notebooks/pipeline.py) (Auto Loader bronze, AUTO CDC silver as SCD Type 1 and 2, expectations), then [src/energy_quality/quality.py](src/energy_quality/quality.py) (the checks as pure functions) with [tests/test_quality.py](tests/test_quality.py) |
 | The platform side | [databricks.yml](databricks.yml) and [resources/job.yml](resources/job.yml) (the bundle and the three-task job) and [.github/workflows/ci.yml](.github/workflows/ci.yml) (test, validate, deploy, publish) |
 | The trade-offs | The Free Edition constraints and known limitations further down |
 
@@ -44,12 +45,15 @@ job that cannot run up a bill that does not exist.
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
     SMARD["SMARD.de"] -->|"Python wheel"| I["Job task: ingest"]
-    I -->|append-only| B[("bronze_prices (Delta)")]
-    B --> P["Lakeflow pipeline"]
-    P -->|"dedupe + expectations"| S[("silver_prices")]
-    S --> G[("gold_daily")]
+    I -->|"one JSON-lines file per run"| V[("UC Volume: landing")]
+    subgraph P["Lakeflow pipeline (DLT)"]
+        V -->|Auto Loader| B[("bronze_prices (streaming table)")]
+        B -->|"expectations, AUTO CDC SCD 1"| S[("silver_prices_latest")]
+        B -->|"AUTO CDC SCD 2"| H[("silver_price_revisions")]
+        S --> G[("gold_daily (materialized view)")]
+    end
     S --> Q["Job task: quality report"]
     G --> Q
     Q --> R[("quality_report")]
@@ -58,19 +62,25 @@ flowchart LR
     C["GitHub Actions"] -.validate + deploy.-> T
 ```
 
-One Unity Catalog schema holds a medallion of three Delta tables plus the
-report:
+One Unity Catalog schema holds the landing Volume, a medallion of Delta tables
+and the report:
 
-- **bronze_prices** - append-only landing of published SMARD hours
-- **silver_prices** - one row per `(region, delivery_ts)`; the newest
-  `fetched_at` wins, enforced in the pipeline
-- **gold_daily** - hours, average/min/max price and negative hours per day
+- **landing** (Volume) - raw SMARD batches, one JSON-lines file per ingest run
+- **bronze_prices** - streaming table: every landed batch, read incrementally by
+  Auto Loader, with the source file of each row
+- **silver_prices_latest** - one row per `(region, delivery_ts)`: AUTO CDC keeps
+  the newest `fetched_at` (SCD Type 1)
+- **silver_price_revisions** - every distinct published price per hour with
+  `__START_AT` and `__END_AT` (SCD Type 2); a refetch of the same price adds no
+  version
+- **gold_daily** - materialized view: hours, average/min/max price and negative
+  hours per day
 - **quality_report** - every check run, appended so history is queryable
 
 ## What it looks like
 
-The daily workflow and the pipeline lineage with the deduplicated silver output
-(360 hours) and daily gold aggregates:
+The daily workflow and the pipeline lineage (captured before bronze moved into
+the pipeline with Auto Loader and silver to AUTO CDC):
 
 ![Job run](docs/images/job-run.png)
 
@@ -88,10 +98,11 @@ hours - and the quality report the first run wrote before the boundary-day fix
 
 | Capability | Where |
 | --- | --- |
-| Unity Catalog | `catalog.schema.table` naming, variables in the bundle |
-| Medallion architecture | bronze (raw landing) → silver (deduplicated) → gold (daily aggregates) |
-| Delta Lake | append landing, dedupe, aggregates, report history |
-| Lakeflow pipelines (formerly Delta Live Tables) | `src/notebooks/pipeline.py` with expectations |
+| Unity Catalog | a managed Volume for raw files and `catalog.schema.table` naming, both as bundle resources and variables |
+| Medallion architecture | bronze (raw batches) → silver (latest price, and every revision) → gold (daily aggregates) |
+| Delta Lake | streaming tables, materialized views, report history |
+| Lakeflow pipelines (formerly Delta Live Tables) | `src/notebooks/pipeline.py`: Auto Loader, expectations, streaming tables and a materialized view |
+| Change data capture | AUTO CDC (formerly `APPLY CHANGES`) into SCD Type 1 and SCD Type 2 tables, sequenced by fetch time |
 | Workflows / Jobs | three tasks with dependencies; the SMARD ingest retries twice, 10 min apart |
 | Asset Bundles (now Declarative Automation Bundles) | `databricks.yml` + `resources/`, wheel artifact |
 | CI/CD | GitHub Actions: tests always, bundle validate + deploy when a token exists |
@@ -103,7 +114,7 @@ hours - and the quality report the first run wrote before the boundary-day fix
 
 - **Serverless only** - no cluster configuration anywhere; the pipeline sets
   `serverless: true`.
-- **Quota-limited** - one source, three tables, one short daily job that runs
+- **Quota-limited** - one source, a few small tables, one short daily job that runs
   once a day at 06:30 Europe/Berlin.
 - **No account-level APIs** - the bundle uses workspace-level resources only.
 - **Personal, non-commercial use** - this is an openly documented prototype.
@@ -111,10 +122,13 @@ hours - and the quality report the first run wrote before the boundary-day fix
 ## The daily job
 
 1. **ingest** - the wheel's SMARD client fetches the recent weekly chunks and
-   appends the published hours to `bronze_prices`. A failed fetch is retried
-   twice, ten minutes apart, before the run fails.
-2. **transform** - the Lakeflow pipeline deduplicates bronze (newest revision
-   per hour), drops rows missing keys or prices, and builds `gold_daily`.
+   writes them as one JSON-lines file to the `landing` Volume (under a hidden
+   name first, then renamed, so Auto Loader never reads a half-written file). A
+   failed fetch is retried twice, ten minutes apart, before the run fails.
+2. **transform** - the Lakeflow pipeline reads new files into `bronze_prices`
+   with Auto Loader, drops rows missing keys, prices or fetch time, applies
+   them with AUTO CDC to `silver_prices_latest` and `silver_price_revisions`,
+   and rebuilds `gold_daily`.
 3. **quality** - freshness (26 h SLA), price bounds (-500..1000 EUR/MWh),
    silver uniqueness and daily hour counts (23/24/25, DST-aware; the first and
    last day of the rolling window are partial by construction and skipped) are
@@ -188,7 +202,9 @@ so viewers see the new revision.
   exceeded, compute is disabled for the rest of the day (occasionally longer),
   so a scheduled run can be skipped. The pipeline is built for that - the
   ingest window is three weekly chunks and silver keeps the newest revision, so
-  the next successful run recovers the gap without a manual backfill.
+  the next successful run recovers the gap without a manual backfill. In
+  late September 2026 compute stayed disabled for eight days; the first run
+  afterwards restored every missing hour.
 - The workspace is private, so there is no public live link - reviewers can
   sign up for Free Edition (free) and deploy the bundle themselves.
 - First deploys on a fresh workspace can surface serverless-specific tweaks,
@@ -196,18 +212,26 @@ so viewers see the new revision.
   tasks reject task-level `libraries` (the wheel belongs in the job
   environment), that environment requires an `environment_version`, and paths
   in `environments[].spec.dependencies` resolve relative to the resource file
-  (`../dist/*.whl`), not the bundle root.
+  (`../dist/*.whl`), not the bundle root. Serverless environments can also
+  keep a cached wheel with the same version, so the version is bumped whenever
+  the package changes.
+- Moving bronze into the pipeline needed a migration. The earlier bronze table
+  is kept as `bronze_prices_legacy`, and its rows were exported once into the
+  landing Volume, so the pipeline holds the full revision history. A
+  materialized view cannot become a streaming table in place, so the AUTO CDC
+  output got a new name, `silver_prices_latest`; the old `silver_prices` view is
+  no longer updated.
 
 ## Layout
 
 ```
 databricks.yml                       bundle definition (variables, wheel, target)
-resources/                           pipeline, job and dashboard resources
+resources/                           volume, pipeline, job and dashboard resources
 src/energy_quality/                  package: SMARD client, quality checks, tasks
 src/notebooks/                       Databricks notebooks (ingest, pipeline, report)
 src/dashboard.lvdash.json            dashboard definition (deployed as code)
 scripts/publish_dashboard.py         publishes the deployed dashboard draft
-tests/                               unit tests for parsers and quality rules
+tests/                               unit tests for parsers, landing files and quality rules
 sql/                                 dashboard queries
 .github/workflows/ci.yml             tests + conditional bundle validate/deploy
 ```
