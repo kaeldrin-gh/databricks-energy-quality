@@ -4,15 +4,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A managed-lakehouse data-engineering project on **Databricks Free Edition**:
-German day-ahead prices land in Delta, are deduplicated by a Lakeflow pipeline
-with quality expectations, and are monitored by a daily workflow that writes a
+German day-ahead prices flow through a bronze/silver/gold medallion in Delta,
+are deduplicated by a Lakeflow pipeline (formerly Delta Live Tables) with
+quality expectations, and are monitored by a daily workflow that writes a
 quality report and fails when the data stops being trustworthy.
 
-**Stack:** Python · PySpark · Databricks Free Edition (Unity Catalog, Delta, Lakeflow, Workflows, Bundles) · GitHub Actions
+**Stack:** Python · PySpark · Databricks Free Edition (Unity Catalog, Delta Lake, Lakeflow pipelines / DLT, Workflows / Jobs, Asset Bundles) · GitHub Actions
 
 Companion projects:
 [de-energy-streaming](https://github.com/kaeldrin-gh/de-energy-streaming)
-(self-hosted streaming lakehouse) and
+(self-hosted streaming lakehouse),
+[nl-parliament-warehouse](https://github.com/kaeldrin-gh/nl-parliament-warehouse)
+(change data capture into BigQuery) and
 [nl-energy-warehouse](https://github.com/kaeldrin-gh/nl-energy-warehouse)
 (dbt analytics engineering).
 
@@ -27,10 +30,11 @@ Companion projects:
 
 ## Why this project exists
 
-The other two repositories prove streaming and analytics engineering on a
-local, self-hosted stack. This one is deliberately different: it shows the
-**managed-platform** side of the job - Unity Catalog, Delta, Lakeflow
-pipelines, workflows, bundles and CI/CD - on a workspace that costs nothing.
+The companion repositories prove streaming, change data capture and analytics
+engineering on self-hosted and free cloud stacks. This one is deliberately
+different: it shows the **managed-platform** side of the job - Unity Catalog,
+Delta Lake, Lakeflow pipelines (Delta Live Tables), Workflows, Asset Bundles
+and CI/CD - on a workspace that costs nothing.
 
 Databricks Free Edition needs no credit card, but it is constrained, and the
 project is built around those constraints on purpose:
@@ -50,11 +54,12 @@ flowchart LR
     G --> Q
     Q --> R[("quality_report")]
     W["Workflow (daily 06:30)"] -.runs.-> I
-    T["Declarative Automation Bundle"] -.deploys.-> W
+    T["Asset Bundle (Declarative Automation Bundle)"] -.deploys.-> W
     C["GitHub Actions"] -.validate + deploy.-> T
 ```
 
-One Unity Catalog schema, three Delta tables plus the report:
+One Unity Catalog schema holds a medallion of three Delta tables plus the
+report:
 
 - **bronze_prices** - append-only landing of published SMARD hours
 - **silver_prices** - one row per `(region, delivery_ts)`; the newest
@@ -84,10 +89,11 @@ hours - and the quality report the first run wrote before the boundary-day fix
 | Capability | Where |
 | --- | --- |
 | Unity Catalog | `catalog.schema.table` naming, variables in the bundle |
+| Medallion architecture | bronze (raw landing) → silver (deduplicated) → gold (daily aggregates) |
 | Delta Lake | append landing, dedupe, aggregates, report history |
-| Lakeflow Spark Declarative Pipelines | `src/notebooks/pipeline.py` with expectations |
+| Lakeflow pipelines (formerly Delta Live Tables) | `src/notebooks/pipeline.py` with expectations |
 | Workflows / Jobs | three tasks with dependencies; the SMARD ingest retries twice, 10 min apart |
-| Declarative Automation Bundles | `databricks.yml` + `resources/`, wheel artifact |
+| Asset Bundles (now Declarative Automation Bundles) | `databricks.yml` + `resources/`, wheel artifact |
 | CI/CD | GitHub Actions: tests always, bundle validate + deploy when a token exists |
 | Data-quality monitoring | freshness, bounds, uniqueness and DST-aware day checks |
 | AI/BI dashboards | `src/dashboard.lvdash.json` deployed as a bundle resource |
