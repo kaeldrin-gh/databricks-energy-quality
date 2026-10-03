@@ -3,12 +3,13 @@
 [![ci](https://github.com/kaeldrin-gh/databricks-energy-quality/actions/workflows/ci.yml/badge.svg)](https://github.com/kaeldrin-gh/databricks-energy-quality/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A managed-lakehouse data-engineering project on **Databricks Free Edition**:
-German day-ahead prices land as files in a Unity Catalog Volume, flow through a
-bronze/silver/gold medallion in a Lakeflow pipeline (formerly Delta Live
-Tables) with Auto Loader, AUTO CDC and quality expectations, and are monitored
-by a daily workflow that writes a quality report and fails when the data stops
-being trustworthy.
+This project is a managed lakehouse on **Databricks Free Edition**.
+
+German day-ahead prices arrive as files in a Unity Catalog Volume. A Lakeflow
+pipeline (formerly Delta Live Tables) moves them through a bronze, silver and
+gold medallion. The pipeline uses Auto Loader, AUTO CDC and quality
+expectations. A daily workflow monitors the data and writes a quality report.
+If the data is not correct, the workflow fails.
 
 **Stack:** Python · PySpark · Databricks Free Edition (Unity Catalog, Delta Lake, Lakeflow pipelines / DLT, Workflows / Jobs, Asset Bundles) · GitHub Actions
 
@@ -31,16 +32,23 @@ Companion projects:
 
 ## Why this project exists
 
-The companion repositories prove streaming, change data capture and analytics
-engineering on self-hosted and free cloud stacks. This one is deliberately
-different: it shows the **managed-platform** side of the job - Unity Catalog,
-Delta Lake, Lakeflow pipelines (Delta Live Tables), Workflows, Asset Bundles
-and CI/CD - on a workspace that costs nothing.
+The companion repositories show streaming, change data capture and analytics
+engineering on self-hosted and free cloud stacks. This project is intentionally
+different. It shows the **managed-platform** side of the work, on a workspace
+that costs nothing:
 
-Databricks Free Edition needs no credit card, but it is constrained, and the
-project is built around those constraints on purpose:
-serverless compute only, quota limits, one workspace, and a single small daily
-job that cannot run up a bill that does not exist.
+- Unity Catalog and Delta Lake
+- Lakeflow pipelines (Delta Live Tables)
+- Workflows and Asset Bundles
+- CI/CD
+
+Databricks Free Edition needs no credit card, but it has limits. The design of
+the project agrees with these limits:
+
+- It uses only serverless compute.
+- It stays inside the usage quota.
+- It uses one workspace.
+- It has one small daily job. There is no bill, so the job cannot make costs.
 
 ## Architecture
 
@@ -62,39 +70,36 @@ flowchart TB
     C["GitHub Actions"] -.validate + deploy.-> T
 ```
 
-One Unity Catalog schema holds the landing Volume, a medallion of Delta tables
-and the report:
+One Unity Catalog schema contains the landing Volume, a medallion of Delta
+tables and the report:
 
-- **landing** (Volume) - raw SMARD batches, one JSON-lines file per ingest run
-- **bronze_prices** - streaming table: every landed batch, read incrementally by
-  Auto Loader, with the source file of each row
-- **silver_prices_latest** - one row per `(region, delivery_ts)`: AUTO CDC keeps
-  the newest `fetched_at` (SCD Type 1)
-- **silver_price_revisions** - every distinct published price per hour with
-  `__START_AT` and `__END_AT` (SCD Type 2); a refetch of the same price adds no
-  version
-- **gold_daily** - materialized view: hours, average/min/max price and negative
-  hours per day
-- **quality_report** - every check run, appended so history is queryable
+| Object | Contents |
+| --- | --- |
+| **landing** (Volume) | The raw SMARD batches. Each ingest run writes one JSON-lines file |
+| **bronze_prices** | A streaming table with all landed batches. Auto Loader reads them incrementally. Each row keeps the name of its source file |
+| **silver_prices_latest** | One row for each `(region, delivery_ts)`. AUTO CDC keeps the newest `fetched_at` (SCD Type 1) |
+| **silver_price_revisions** | Each different published price for each hour, with `__START_AT` and `__END_AT` (SCD Type 2). If a new fetch gives the same price, no new version occurs |
+| **gold_daily** | A materialized view. For each day: the hours, the average, minimum and maximum price, and the negative hours |
+| **quality_report** | One row for each check and run. Each run adds its rows, so you can query the history |
 
 ## What it looks like
 
-The daily workflow and the pipeline lineage (captured before bronze moved into
-the pipeline with Auto Loader and silver to AUTO CDC):
+The daily workflow and the pipeline lineage. These screenshots are older than
+the move of bronze into the pipeline (Auto Loader) and of silver to AUTO CDC:
 
 ![Job run](docs/images/job-run.png)
 
 ![Pipeline lineage](docs/images/pipeline-lineage.png)
 
-The dashboard after the scheduled run on 3 Oct 2026: all four checks passing,
-and 30 days of prices and negative-price hours with no gaps, including the days
-the Free Edition quota skipped in late September (the next run's three-week
-ingest window filled them in):
+The dashboard after the scheduled run on 3 Oct 2026. All four checks pass.
+The charts show 30 days of prices and negative-price hours with no gaps. In
+late September, the Free Edition quota stopped some runs. The three-week ingest
+window of the next run filled these days:
 
 ![Dashboard](docs/images/dashboard.png)
 
-The quality report the first run wrote before the boundary-day fix (the gate
-failing loudly instead of passing silently):
+The quality report from the first run, before the boundary-day fix. The gate
+failed visibly. It did not pass with incorrect data:
 
 ![Quality report](docs/images/quality-report.png)
 
@@ -116,36 +121,45 @@ failing loudly instead of passing silently):
 
 ## Free Edition constraints this respects
 
-- **Serverless only** - no cluster configuration anywhere; the pipeline sets
-  `serverless: true`.
-- **Quota-limited** - one source, a few small tables, one short daily job that runs
-  once a day at 06:30 Europe/Berlin.
-- **No account-level APIs** - the bundle uses workspace-level resources only.
-- **Personal, non-commercial use** - this is an openly documented prototype.
+- **Serverless only.** The project has no cluster configuration. The pipeline
+  sets `serverless: true`.
+- **Usage quota.** The project has one source and some small tables. One short
+  job runs once each day, at 06:30 Europe/Berlin.
+- **No account-level APIs.** The bundle uses only workspace-level resources.
+- **Personal, non-commercial use.** This project is a prototype with open
+  documentation.
 
 ## The daily job
 
-1. **ingest** - the wheel's SMARD client fetches the recent weekly chunks and
-   writes them as one JSON-lines file to the `landing` Volume (under a hidden
-   name first, then renamed, so Auto Loader never reads a half-written file). A
-   failed fetch is retried twice, ten minutes apart, before the run fails.
-2. **transform** - the Lakeflow pipeline reads new files into `bronze_prices`
-   with Auto Loader, drops rows missing keys, prices or fetch time, applies
-   them with AUTO CDC to `silver_prices_latest` and `silver_price_revisions`,
-   and rebuilds `gold_daily`.
-3. **quality** - freshness (26 h SLA), price bounds (-500..1000 EUR/MWh),
-   silver uniqueness and daily hour counts (23/24/25, DST-aware; the first and
-   last day of the rolling window are partial by construction and skipped) are
-   checked, appended to `quality_report`, and any failure fails the task.
+1. **ingest:** The SMARD client in the wheel gets the recent weekly chunks.
+   It writes them as one JSON-lines file to the `landing` Volume. It writes the
+   file with a hidden name first and then renames it. Thus, Auto Loader never
+   reads an incomplete file. If a fetch fails, the task tries two more times,
+   ten minutes apart. Then the run fails.
+2. **transform:** The Lakeflow pipeline does these steps:
+   - Auto Loader reads the new files into `bronze_prices`.
+   - The pipeline removes rows without keys, prices or fetch time.
+   - AUTO CDC applies the rows to `silver_prices_latest` and
+     `silver_price_revisions`.
+   - The pipeline makes `gold_daily` again.
+3. **quality:** The task does four checks:
+   - Freshness: the SLA is 26 hours.
+   - Price bounds: from -500 to 1000 EUR/MWh.
+   - Silver uniqueness.
+   - Daily hour counts: 23, 24 or 25, because of DST. The first and the last
+     day of the rolling window are always incomplete, so the check skips them.
 
-The checks live in `src/energy_quality/quality.py` as pure functions, so they
-are unit-tested without a workspace - the same pattern the other two
-repositories use for their correctness rules.
+   The task adds the results to `quality_report`. If a check fails, the task
+   fails.
 
-No notification channel is configured: a failing check fails the task and the
-run, the dashboard's history tile shows the red row, and `quality_report` keeps
-the evidence queryable. A notification destination can be added in the job's
-settings later without touching the bundle.
+The checks are pure functions in `src/energy_quality/quality.py`. Thus, the
+unit tests run without a workspace. The other two repositories use the same
+pattern for their correctness rules.
+
+The job has no notification channel. When a check fails, the task and the run
+fail. The history tile of the dashboard shows the red row. You can query the
+evidence in `quality_report`. To add a notification destination later, use the
+job settings. You do not have to change the bundle.
 
 ## Quickstart (local)
 
@@ -171,60 +185,75 @@ python scripts/publish_dashboard.py -t free          # publish the dashboard dra
 databricks bundle run -t free energy_quality_job    # runs the job once
 ```
 
-Find your catalog name with `SHOW CATALOGS` in the SQL editor and pass it to
-the bundle if it is not `workspace`:
+To find your catalog name, run `SHOW CATALOGS` in the SQL editor. If the name
+is not `workspace`, give it to the bundle:
 
 ```bash
 databricks bundle deploy -t free --var="catalog=<your-catalog>"
 ```
 
-To let CI deploy for you, create a workspace token (Settings -> Developer ->
-Access tokens) with the **All APIs** scope, then add the repository secrets
-`DATABRICKS_HOST` and `DATABRICKS_TOKEN`. Pushes to `main` and manual
-`workflow_dispatch` runs then validate, deploy and publish the dashboard. The
-workflow masks the workspace user path, the email and the workspace host in its
-logs, so the public Actions tab stays free of personal details. Without the
-secrets, CI stays green and skips validation and deploy with a notice.
+To let CI deploy for you:
+
+1. Make a workspace token with the **All APIs** scope (Settings -> Developer ->
+   Access tokens).
+2. Add the repository secrets `DATABRICKS_HOST` and `DATABRICKS_TOKEN`.
+
+After this, each push to `main` and each manual `workflow_dispatch` run
+validates and deploys the bundle and publishes the dashboard. The workflow
+hides the workspace user path, the email and the workspace host in its logs.
+Thus, the public Actions tab shows no personal details. If the secrets are not
+set, CI stays green. It skips the validation and the deploy and shows a
+notice.
 
 ## Dashboard
 
-`src/dashboard.lvdash.json` is the dashboard **as code**: counters (checks
-passed, hours ahead, negative hours, average price), the latest check results,
-the check history, and price and negative-hours charts. It deploys with the
-bundle, and the SQL warehouse is resolved by name through a variable lookup
-(`warehouse_id` in `databricks.yml`), so no workspace-specific ID is committed.
-`sql/quality_queries.sql` has the same queries for ad-hoc use.
+`src/dashboard.lvdash.json` is the dashboard **as code**. It contains:
 
-Bundle deploys update the dashboard *draft*; run
-`python scripts/publish_dashboard.py -t free` (or `make publish`) after a deploy
-so viewers see the new revision.
+- counters: checks passed, hours ahead, negative hours and average price
+- the latest check results and the check history
+- a price chart and a negative-hours chart
+
+The dashboard deploys with the bundle. A variable lookup finds the SQL
+warehouse by name (`warehouse_id` in `databricks.yml`). Thus, the repository
+contains no workspace-specific ID. `sql/quality_queries.sql` has the same
+queries for ad-hoc use.
+
+A bundle deploy updates only the dashboard *draft*. After each deploy, run
+`python scripts/publish_dashboard.py -t free` (or `make publish`). Then viewers
+see the new version.
 
 ## Known limitations
 
-- This is a **prototype on Databricks Free Edition** (personal use), not a
-  production deployment. The free tier enforces a fair-usage quota: when it is
-  exceeded, compute is disabled for the rest of the day (occasionally longer),
-  so a scheduled run can be skipped. The pipeline is built for that - the
-  ingest window is three weekly chunks and silver keeps the newest revision, so
-  the next successful run recovers the gap without a manual backfill. In
-  late September 2026 compute stayed disabled for eight days; the first run
-  afterwards restored every missing hour.
-- The workspace is private, so there is no public live link - reviewers can
-  sign up for Free Edition (free) and deploy the bundle themselves.
-- First deploys on a fresh workspace can surface serverless-specific tweaks,
-  and the bundle now encodes the three this repository hit: serverless job
-  tasks reject task-level `libraries` (the wheel belongs in the job
-  environment), that environment requires an `environment_version`, and paths
-  in `environments[].spec.dependencies` resolve relative to the resource file
-  (`../dist/*.whl`), not the bundle root. Serverless environments can also
-  keep a cached wheel with the same version, so the version is bumped whenever
-  the package changes.
-- Moving bronze into the pipeline needed a migration. The earlier bronze table
-  is kept as `bronze_prices_legacy`, and its rows were exported once into the
-  landing Volume, so the pipeline holds the full revision history. A
-  materialized view cannot become a streaming table in place, so the AUTO CDC
-  output got a new name, `silver_prices_latest`; the old `silver_prices` view is
-  no longer updated.
+- **This project is a prototype on Databricks Free Edition** (personal use).
+  It is not a production deployment.
+  - The free tier has a fair-usage quota. When a workspace goes above it,
+    Databricks stops the compute for the rest of the day, and sometimes
+    longer. Then a scheduled run does not start.
+  - The pipeline can recover from this. The ingest window is three weekly
+    chunks, and silver keeps the newest revision. Thus, the next successful
+    run fills the gap without a manual backfill.
+  - In late September 2026, the compute stayed off for eight days. The first
+    run after that restored all missing hours.
+- **The workspace is private.** Thus, there is no public live link. Reviewers
+  can get a free Free Edition account and deploy the bundle themselves.
+- **The first deploy on a new workspace can need serverless changes.** The
+  bundle contains the three changes that this repository needed:
+  - Serverless job tasks do not accept task-level `libraries`. The wheel goes
+    into the job environment.
+  - That environment must have an `environment_version`.
+  - Paths in `environments[].spec.dependencies` start at the resource file
+    (`../dist/*.whl`), not at the bundle root.
+
+  Serverless environments can also keep an old wheel with the same version in
+  their cache. Thus, the project increases the version each time the package
+  changes.
+- **The move of bronze into the pipeline needed a migration.**
+  - The old bronze table stays as `bronze_prices_legacy`. A one-time export
+    copied its rows into the landing Volume. Thus, the pipeline has the full
+    revision history.
+  - A materialized view cannot change into a streaming table in place. Thus,
+    the AUTO CDC output has a new name, `silver_prices_latest`. The old
+    `silver_prices` view does not get updates now.
 
 ## Layout
 
