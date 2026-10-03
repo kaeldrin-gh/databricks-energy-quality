@@ -86,11 +86,15 @@ the pipeline with Auto Loader and silver to AUTO CDC):
 
 ![Pipeline lineage](docs/images/pipeline-lineage.png)
 
-The dashboard - counters, latest checks, check history, prices and negative-price
-hours - and the quality report the first run wrote before the boundary-day fix
-(the gate failing loudly instead of passing silently):
+The dashboard after the scheduled run on 3 Oct 2026: all four checks passing,
+and 30 days of prices and negative-price hours with no gaps, including the days
+the Free Edition quota skipped in late September (the next run's three-week
+ingest window filled them in):
 
 ![Dashboard](docs/images/dashboard.png)
+
+The quality report the first run wrote before the boundary-day fix (the gate
+failing loudly instead of passing silently):
 
 ![Quality report](docs/images/quality-report.png)
 
