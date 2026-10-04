@@ -6,7 +6,7 @@ ID is read from ``databricks bundle summary -o json``, so this works for any
 target without hardcoding workspace IDs.
 
 Usage:
-    python scripts/publish_dashboard.py [-t free]
+    python scripts/publish_dashboard.py [-t dev|prod]
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ RESOURCE_KEY = "energy_quality_dashboard"
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-t", "--target", default="free", help="bundle target")
+    parser.add_argument("-t", "--target", default="dev", help="bundle target")
     args = parser.parse_args()
 
     summary = json.loads(

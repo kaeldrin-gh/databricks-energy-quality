@@ -4,3 +4,7 @@ resources:
       display_name: energy-quality
       file_path: ../src/dashboard.lvdash.json
       warehouse_id: ${var.warehouse_id}
+      # The queries name tables without catalog and schema, so each target's
+      # dashboard reads its own schema.
+      dataset_catalog: ${var.catalog}
+      dataset_schema: ${resources.schemas.energy_quality.name}

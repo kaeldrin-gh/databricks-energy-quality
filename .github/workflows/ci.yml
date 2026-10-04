@@ -65,16 +65,29 @@ jobs:
             echo "::notice::DATABRICKS_HOST/DATABRICKS_TOKEN secrets are not set - skipping bundle validate and deploy."
           fi
 
-      - name: Validate bundle
+      - name: Validate bundle (dev and prod)
         if: steps.creds.outputs.configured == 'yes'
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
           set -o pipefail
-          databricks bundle validate -t free 2>&1 | sed -E "$LOG_MASK"
+          databricks bundle validate -t dev 2>&1 | sed -E "$LOG_MASK"
+          databricks bundle validate -t prod 2>&1 | sed -E "$LOG_MASK"
 
-      - name: Deploy bundle (main only)
+      # Pull requests deploy to the dev target: prefixed copies of the job and
+      # pipeline, with the schedule paused, in their own schema.
+      - name: Deploy bundle to dev (pull requests)
+        if: steps.creds.outputs.configured == 'yes' && github.event_name == 'pull_request'
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          set -o pipefail
+          pip install build
+          databricks bundle deploy -t dev 2>&1 | sed -E "$LOG_MASK"
+
+      - name: Deploy bundle to prod (main only)
         if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
@@ -82,13 +95,13 @@ jobs:
         run: |
           set -o pipefail
           pip install build
-          databricks bundle deploy -t free 2>&1 | sed -E "$LOG_MASK"
+          databricks bundle deploy -t prod 2>&1 | sed -E "$LOG_MASK"
 
-      - name: Publish dashboard (main only)
+      - name: Publish prod dashboard (main only)
         if: steps.creds.outputs.configured == 'yes' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
           set -o pipefail
-          python scripts/publish_dashboard.py -t free 2>&1 | sed -E "$LOG_MASK"
+          python scripts/publish_dashboard.py -t prod 2>&1 | sed -E "$LOG_MASK"

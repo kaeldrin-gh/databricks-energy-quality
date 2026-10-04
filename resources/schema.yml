@@ -1,0 +1,14 @@
+resources:
+  schemas:
+    # The schema that holds the landing volume and every table. Readers get
+    # USE SCHEMA and SELECT; only the owner (the deploying user, who also runs
+    # the job) can write.
+    energy_quality:
+      catalog_name: ${var.catalog}
+      name: ${var.schema}
+      comment: German day-ahead prices from SMARD - bronze, silver and gold tables and the quality report.
+      grants:
+        - principal: account users
+          privileges:
+            - USE_SCHEMA
+            - SELECT

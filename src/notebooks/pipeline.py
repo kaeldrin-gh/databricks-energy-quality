@@ -22,6 +22,15 @@ RAW_SCHEMA = (
 )
 KEYS = ["region", "delivery_ts"]
 
+# Column comments, shown in Catalog Explorer for every table that has the column.
+PRICE_COLUMNS = (
+    "region STRING COMMENT 'SMARD bidding zone, DE-LU', "
+    "delivery_ts TIMESTAMP COMMENT 'Start of the delivery hour, UTC', "
+    "price_eur_mwh DOUBLE COMMENT 'Day-ahead price in EUR/MWh', "
+    "source STRING COMMENT 'Publisher of the price, smard', "
+    "fetched_at TIMESTAMP COMMENT 'When the ingest task fetched the batch, UTC'"
+)
+
 # COMMAND ----------
 
 
@@ -29,6 +38,7 @@ KEYS = ["region", "delivery_ts"]
     name="bronze_prices",
     comment="Every landed SMARD batch, read incrementally from the landing volume by Auto Loader.",
     table_properties={"quality": "bronze"},
+    schema=PRICE_COLUMNS + ", source_file STRING COMMENT 'Landing file the row was read from'",
 )
 def bronze_prices():
     return (
@@ -57,6 +67,7 @@ dp.create_streaming_table(
     name="silver_prices_latest",
     comment="One row per (region, delivery_ts): AUTO CDC keeps the newest fetched_at (SCD Type 1).",
     table_properties={"quality": "silver"},
+    schema=PRICE_COLUMNS,
 )
 
 dp.create_auto_cdc_flow(
@@ -76,6 +87,11 @@ dp.create_streaming_table(
         "__END_AT from fetched_at (SCD Type 2). A refetch of the same price adds no version."
     ),
     table_properties={"quality": "silver"},
+    schema=(
+        PRICE_COLUMNS + ", __START_AT TIMESTAMP COMMENT 'fetched_at of the first batch with this "
+        "price', __END_AT TIMESTAMP COMMENT 'fetched_at of the batch that changed it; null "
+        "while current'"
+    ),
 )
 
 dp.create_auto_cdc_flow(
@@ -94,6 +110,15 @@ dp.create_auto_cdc_flow(
     name="gold_daily",
     comment="Daily market aggregates from the deduplicated prices.",
     table_properties={"quality": "gold"},
+    schema=(
+        "region STRING COMMENT 'SMARD bidding zone, DE-LU', "
+        "day DATE COMMENT 'Calendar day of the delivery hours', "
+        "hours INT COMMENT 'Delivery hours with a price that day', "
+        "avg_price_eur_mwh DOUBLE COMMENT 'Average price, EUR/MWh', "
+        "min_price_eur_mwh DOUBLE COMMENT 'Lowest hourly price, EUR/MWh', "
+        "max_price_eur_mwh DOUBLE COMMENT 'Highest hourly price, EUR/MWh', "
+        "negative_hours INT COMMENT 'Hours with a price below zero'"
+    ),
 )
 @dp.expect("has_hours", "hours > 0")
 def gold_daily():

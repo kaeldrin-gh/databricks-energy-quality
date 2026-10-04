@@ -27,7 +27,7 @@ Companion projects:
 | --- | --- |
 | 2 minutes | The architecture and the four screenshots below (the workspace is private, so there is no live link) |
 | 10 minutes | [src/notebooks/pipeline.py](src/notebooks/pipeline.py) (Auto Loader bronze, AUTO CDC silver as SCD Type 1 and 2, expectations), then [src/energy_quality/quality.py](src/energy_quality/quality.py) (the checks as pure functions) with [tests/test_quality.py](tests/test_quality.py) |
-| The platform side | [databricks.yml](databricks.yml) and [resources/job.yml](resources/job.yml) (the bundle and the three-task job) and [.github/workflows/ci.yml](.github/workflows/ci.yml) (test, validate, deploy, publish) |
+| The platform side | [databricks.yml](databricks.yml) (dev and prod targets), [resources/](resources/) (schema with grants, Volume, pipeline, three-task job) and [.github/workflows/ci.yml](.github/workflows/ci.yml) (test, validate, deploy, publish) |
 | The trade-offs | The Free Edition constraints and known limitations further down |
 
 ## Why this project exists
@@ -107,14 +107,14 @@ failed visibly. It did not pass with incorrect data:
 
 | Capability | Where |
 | --- | --- |
-| Unity Catalog | a managed Volume for raw files and `catalog.schema.table` naming, both as bundle resources and variables |
+| Unity Catalog | the schema and a managed Volume as bundle resources, with grants as code (read-only for `account users`; only the owner writes) and table and column comments |
 | Medallion architecture | bronze (raw batches) → silver (latest price, and every revision) → gold (daily aggregates) |
 | Delta Lake | streaming tables, materialized views, report history |
 | Lakeflow pipelines (formerly Delta Live Tables) | `src/notebooks/pipeline.py`: Auto Loader, expectations, streaming tables and a materialized view |
 | Change data capture | AUTO CDC (formerly `APPLY CHANGES`) into SCD Type 1 and SCD Type 2 tables, sequenced by fetch time |
 | Workflows / Jobs | three tasks with dependencies; the SMARD ingest retries twice, 10 min apart |
-| Asset Bundles (now Declarative Automation Bundles) | `databricks.yml` + `resources/`, wheel artifact |
-| CI/CD | GitHub Actions: tests always, bundle validate + deploy when a token exists |
+| Asset Bundles (now Declarative Automation Bundles) | `databricks.yml` + `resources/`, wheel artifact, `dev` (development mode) and `prod` (production mode) targets |
+| CI/CD | GitHub Actions: tests always; when a token exists, both targets validated, pull requests deployed to `dev` and `main` to `prod` |
 | Data-quality monitoring | freshness, bounds, uniqueness and DST-aware day checks |
 | AI/BI dashboards | `src/dashboard.lvdash.json` deployed as a bundle resource |
 | Cost awareness | serverless-only config, one small daily job, quota-friendly |
@@ -126,6 +126,13 @@ failed visibly. It did not pass with incorrect data:
 - **Usage quota.** The project has one source and some small tables. One short
   job runs once each day, at 06:30 Europe/Berlin.
 - **No account-level APIs.** The bundle uses only workspace-level resources.
+  Thus, the grants go to the built-in `account users` group, not to custom
+  groups.
+- **One workspace.** The `dev` and `prod` targets use the same workspace.
+  Development mode keeps them apart:
+  - Dev jobs, pipelines and dashboards get the name prefix `[dev <user>]`.
+  - The dev schema gets the prefix `dev_<user>_`.
+  - The dev schedule is paused.
 - **Personal, non-commercial use.** This project is a prototype with open
   documentation.
 
@@ -179,17 +186,18 @@ winget install Databricks.DatabricksCLI    # or brew, or the install script
 databricks auth login --host https://<your-workspace>.cloud.databricks.com
 
 pip install build
-databricks bundle validate -t free
-databricks bundle deploy -t free
-python scripts/publish_dashboard.py -t free          # publish the dashboard draft
-databricks bundle run -t free energy_quality_job    # runs the job once
+databricks bundle validate -t dev
+databricks bundle deploy -t dev                      # prefixed copies, schedule paused
+databricks bundle run -t dev energy_quality_job      # runs the dev job once
+databricks bundle deploy -t prod                     # the scheduled job
+python scripts/publish_dashboard.py -t prod          # publish the dashboard draft
 ```
 
 To find your catalog name, run `SHOW CATALOGS` in the SQL editor. If the name
 is not `workspace`, give it to the bundle:
 
 ```bash
-databricks bundle deploy -t free --var="catalog=<your-catalog>"
+databricks bundle deploy -t dev --var="catalog=<your-catalog>"
 ```
 
 To let CI deploy for you:
@@ -198,12 +206,17 @@ To let CI deploy for you:
    Access tokens).
 2. Add the repository secrets `DATABRICKS_HOST` and `DATABRICKS_TOKEN`.
 
-After this, each push to `main` and each manual `workflow_dispatch` run
-validates and deploys the bundle and publishes the dashboard. The workflow
-hides the workspace user path, the email and the workspace host in its logs.
-Thus, the public Actions tab shows no personal details. If the secrets are not
-set, CI stays green. It skips the validation and the deploy and shows a
-notice.
+After this, CI does these steps:
+
+- Each run validates the `dev` and `prod` targets.
+- Each pull request deploys to `dev`.
+- Each push to `main` and each manual `workflow_dispatch` run deploys to
+  `prod` and publishes the dashboard.
+
+The workflow hides the workspace user path, the email and the workspace host in
+its logs. Thus, the public Actions tab shows no personal details. If the
+secrets are not set, CI stays green. It skips the validation and the deploy and
+shows a notice.
 
 ## Dashboard
 
@@ -218,9 +231,13 @@ warehouse by name (`warehouse_id` in `databricks.yml`). Thus, the repository
 contains no workspace-specific ID. `sql/quality_queries.sql` has the same
 queries for ad-hoc use.
 
+The queries do not include a catalog or a schema in the table names. The
+bundle sets the default catalog and schema of the dashboard for each target.
+Thus, the dev dashboard reads the dev tables.
+
 A bundle deploy updates only the dashboard *draft*. After each deploy, run
-`python scripts/publish_dashboard.py -t free` (or `make publish`). Then viewers
-see the new version.
+`python scripts/publish_dashboard.py -t prod` (or `make publish TARGET=prod`).
+Then viewers see the new version.
 
 ## Known limitations
 
@@ -254,12 +271,21 @@ see the new version.
   - A materialized view cannot change into a streaming table in place. Thus,
     the AUTO CDC output has a new name, `silver_prices_latest`. The old
     `silver_prices` view does not get updates now.
+- **The `prod` target continues an older target.** The first deployments used
+  one target with the name `free`.
+  - The `prod` target uses the workspace path of `free`. Thus, its deployment
+    state still contains the job and the pipeline.
+  - The schema existed before the bundle managed it.
+    `databricks bundle deployment bind` connected it to the bundle.
+  - The bundle now manages the schema. Thus, `databricks bundle destroy -t prod`
+    tries to delete the schema and all its tables. The CLI asks for
+    confirmation before it deletes a schema.
 
 ## Layout
 
 ```
-databricks.yml                       bundle definition (variables, wheel, target)
-resources/                           volume, pipeline, job and dashboard resources
+databricks.yml                       bundle definition (variables, wheel, dev and prod targets)
+resources/                           schema, volume, pipeline, job and dashboard resources
 src/energy_quality/                  package: SMARD client, quality checks, tasks
 src/notebooks/                       Databricks notebooks (ingest, pipeline, report)
 src/dashboard.lvdash.json            dashboard definition (deployed as code)

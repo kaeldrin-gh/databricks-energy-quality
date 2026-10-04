@@ -3,27 +3,27 @@
     {
       "name": "ds_checks",
       "displayName": "Latest quality checks",
-      "query": "SELECT check_name, status, detail, checked_at\nFROM workspace.energy_quality.quality_report\nWHERE checked_at = (SELECT max(checked_at) FROM workspace.energy_quality.quality_report)\nORDER BY check_name"
+      "query": "SELECT check_name, status, detail, checked_at\nFROM quality_report\nWHERE checked_at = (SELECT max(checked_at) FROM quality_report)\nORDER BY check_name"
     },
     {
       "name": "ds_history",
       "displayName": "Check history",
-      "query": "SELECT checked_at, check_name, status\nFROM workspace.energy_quality.quality_report\nORDER BY checked_at DESC\nLIMIT 40"
+      "query": "SELECT checked_at, check_name, status\nFROM quality_report\nORDER BY checked_at DESC\nLIMIT 40"
     },
     {
       "name": "ds_freshness",
       "displayName": "Freshness",
-      "query": "SELECT round((unix_timestamp(max(delivery_ts)) - unix_timestamp(current_timestamp())) / 3600, 1) AS hours_ahead\nFROM workspace.energy_quality.silver_prices_latest"
+      "query": "SELECT round((unix_timestamp(max(delivery_ts)) - unix_timestamp(current_timestamp())) / 3600, 1) AS hours_ahead\nFROM silver_prices_latest"
     },
     {
       "name": "ds_summary",
       "displayName": "Summary",
-      "query": "SELECT\n  (SELECT count(*) FROM workspace.energy_quality.quality_report\n   WHERE checked_at = (SELECT max(checked_at) FROM workspace.energy_quality.quality_report)\n     AND status = 'ok') AS checks_ok,\n  (SELECT sum(negative_hours) FROM workspace.energy_quality.gold_daily\n   WHERE day >= current_date() - INTERVAL 30 DAYS) AS negative_hours_30d,\n  (SELECT round(avg(avg_price_eur_mwh), 1) FROM workspace.energy_quality.gold_daily\n   WHERE day >= current_date() - INTERVAL 30 DAYS) AS avg_price_30d"
+      "query": "SELECT\n  (SELECT count(*) FROM quality_report\n   WHERE checked_at = (SELECT max(checked_at) FROM quality_report)\n     AND status = 'ok') AS checks_ok,\n  (SELECT sum(negative_hours) FROM gold_daily\n   WHERE day >= current_date() - INTERVAL 30 DAYS) AS negative_hours_30d,\n  (SELECT round(avg(avg_price_eur_mwh), 1) FROM gold_daily\n   WHERE day >= current_date() - INTERVAL 30 DAYS) AS avg_price_30d"
     },
     {
       "name": "ds_daily",
       "displayName": "Daily prices",
-      "query": "SELECT day, avg_price_eur_mwh, negative_hours\nFROM workspace.energy_quality.gold_daily\nWHERE day >= current_date() - INTERVAL 30 DAYS\nORDER BY day"
+      "query": "SELECT day, avg_price_eur_mwh, negative_hours\nFROM gold_daily\nWHERE day >= current_date() - INTERVAL 30 DAYS\nORDER BY day"
     }
   ],
   "pages": [

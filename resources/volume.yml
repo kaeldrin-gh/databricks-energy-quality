@@ -4,7 +4,11 @@ resources:
     # and the pipeline reads them with Auto Loader.
     landing:
       catalog_name: ${var.catalog}
-      schema_name: ${var.schema}
+      schema_name: ${resources.schemas.energy_quality.name}
       name: landing
       volume_type: MANAGED
       comment: Raw SMARD day-ahead price batches (JSON lines), one file per ingest run.
+      grants:
+        - principal: account users
+          privileges:
+            - READ_VOLUME

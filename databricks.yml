@@ -25,7 +25,19 @@ artifacts:
     path: .
 
 targets:
-  # One plain target: resource names match the repository; the job runs once
-  # a day at 06:30 Europe/Berlin (see resources/job.yml) to stay within quota.
-  free:
+  # Development copies for trying changes without touching prod data. Development
+  # mode prefixes the job, pipeline and dashboard names with [dev <user>], the
+  # schema with dev_<user>_, pauses the schedule and runs the pipeline in
+  # development mode.
+  dev:
+    mode: development
     default: true
+
+  # The daily job and the tables the dashboard reads. The job runs once a day
+  # at 06:30 Europe/Berlin (see resources/job.yml) to stay within quota.
+  prod:
+    mode: production
+    workspace:
+      # The first deployments used a target named `free`; keeping its root
+      # path keeps the existing job, pipeline and tables in this target's state.
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/free
