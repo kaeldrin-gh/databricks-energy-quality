@@ -84,10 +84,14 @@ tables and the report:
 
 ## What it looks like
 
-The daily workflow and the pipeline lineage. These screenshots are older than
-the move of bronze into the pipeline (Auto Loader) and of silver to AUTO CDC:
+The daily workflow runs three tasks. The transform task starts the Lakeflow
+pipeline:
 
 ![Job run](docs/images/job-run.png)
+
+The pipeline lineage on 4 Oct 2026. Auto Loader reads one new landing file into
+`bronze_prices`. AUTO CDC applies the rows to both silver tables. The change
+to market days made `gold_daily` do a full recompute:
 
 ![Pipeline lineage](docs/images/pipeline-lineage.png)
 
