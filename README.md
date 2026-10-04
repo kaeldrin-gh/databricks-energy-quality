@@ -272,7 +272,7 @@ Then viewers see the new version.
     revision history.
   - A materialized view cannot change into a streaming table in place. Thus,
     the AUTO CDC output has a new name, `silver_prices_latest`. The old
-    `silver_prices` view does not get updates now.
+    `silver_prices` view was dropped after the migration.
 - **The `prod` target continues an older target.** The first deployments used
   one target with the name `free`.
   - The `prod` target uses the workspace path of `free`. Thus, its deployment
