@@ -79,7 +79,7 @@ tables and the report:
 | **bronze_prices** | A streaming table with all landed batches. Auto Loader reads them incrementally. Each row keeps the name of its source file |
 | **silver_prices_latest** | One row for each `(region, delivery_ts)`. AUTO CDC keeps the newest `fetched_at` (SCD Type 1) |
 | **silver_price_revisions** | Each different published price for each hour, with `__START_AT` and `__END_AT` (SCD Type 2). If a new fetch gives the same price, no new version occurs |
-| **gold_daily** | A materialized view. For each day: the hours, the average, minimum and maximum price, and the negative hours |
+| **gold_daily** | A materialized view. For each market day (midnight to midnight, Europe/Berlin time): the hours, the average, minimum and maximum price, and the negative hours |
 | **quality_report** | One row for each check and run. Each run adds its rows, so you can query the history |
 
 ## What it looks like
@@ -153,8 +153,10 @@ failed visibly. It did not pass with incorrect data:
    - Freshness: the SLA is 26 hours.
    - Price bounds: from -500 to 1000 EUR/MWh.
    - Silver uniqueness.
-   - Daily hour counts: 23, 24 or 25, because of DST. The first and the last
-     day of the rolling window are always incomplete, so the check skips them.
+   - Daily hour counts: 23, 24 or 25. A market day runs from midnight to
+     midnight German time, so it has 23 hours when the clocks go forward and
+     25 hours when they go back. The first and the last day of the rolling
+     window can be incomplete, so the check skips them.
 
    The task adds the results to `quality_report`. If a check fails, the task
    fails.

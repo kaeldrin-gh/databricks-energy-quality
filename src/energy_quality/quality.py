@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo
 
 # Exchange sanity bounds; a price outside these is a unit or scale bug.
 PRICE_LOW = -500.0
@@ -17,6 +18,9 @@ PRICE_HIGH = 1000.0
 FRESHNESS_SLA_HOURS = 26.0
 # Day-ahead hours are published ahead of delivery; more than this is a glitch.
 MAX_AHEAD_HOURS = 36.0
+# The DE-LU market day runs from midnight to midnight German time, so it has 23
+# or 25 hours on the days the clocks change. gold_daily groups by the same zone.
+MARKET_TZ = "Europe/Berlin"
 
 
 @dataclass(frozen=True)
@@ -81,6 +85,13 @@ def check_unique_keys(pairs: list[tuple[str, dt.datetime]]) -> CheckResult:
     if unique != total:
         return CheckResult("unique_keys", "fail", detail, float(total - unique))
     return CheckResult("unique_keys", "ok", detail, 0.0)
+
+
+def market_day(delivery_ts: dt.datetime) -> dt.date:
+    """The market day of a delivery hour; naive timestamps are UTC."""
+    if delivery_ts.tzinfo is None:
+        delivery_ts = delivery_ts.replace(tzinfo=dt.timezone.utc)
+    return delivery_ts.astimezone(ZoneInfo(MARKET_TZ)).date()
 
 
 def select_complete_days(

@@ -21,6 +21,9 @@ RAW_SCHEMA = (
     "source STRING, fetched_at TIMESTAMP"
 )
 KEYS = ["region", "delivery_ts"]
+# Market days run midnight to midnight German time (23 or 25 hours when the
+# clocks change); same zone as energy_quality.quality.MARKET_TZ.
+MARKET_TZ = "Europe/Berlin"
 
 # Column comments, shown in Catalog Explorer for every table that has the column.
 PRICE_COLUMNS = (
@@ -112,7 +115,7 @@ dp.create_auto_cdc_flow(
     table_properties={"quality": "gold"},
     schema=(
         "region STRING COMMENT 'SMARD bidding zone, DE-LU', "
-        "day DATE COMMENT 'Calendar day of the delivery hours', "
+        "day DATE COMMENT 'Market day of the delivery hours, Europe/Berlin', "
         "hours INT COMMENT 'Delivery hours with a price that day', "
         "avg_price_eur_mwh DOUBLE COMMENT 'Average price, EUR/MWh', "
         "min_price_eur_mwh DOUBLE COMMENT 'Lowest hourly price, EUR/MWh', "
@@ -123,7 +126,9 @@ dp.create_auto_cdc_flow(
 @dp.expect("has_hours", "hours > 0")
 def gold_daily():
     silver = spark.read.table("silver_prices_latest")
-    return silver.groupBy("region", F.to_date("delivery_ts").alias("day")).agg(
+    # delivery_ts holds UTC (the pipeline pins the session time zone to UTC).
+    day = F.to_date(F.from_utc_timestamp("delivery_ts", MARKET_TZ))
+    return silver.groupBy("region", day.alias("day")).agg(
         F.count("*").cast("int").alias("hours"),
         F.round(F.avg("price_eur_mwh"), 2).alias("avg_price_eur_mwh"),
         F.round(F.min("price_eur_mwh"), 2).alias("min_price_eur_mwh"),

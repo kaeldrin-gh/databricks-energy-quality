@@ -15,6 +15,7 @@ from energy_quality.quality import (
     check_freshness,
     check_price_bounds,
     check_unique_keys,
+    market_day,
     select_complete_days,
 )
 
@@ -46,7 +47,7 @@ def run_quality_report(
     ).collect()
 
     day_hours = [(row["day"], int(row["hours"])) for row in day_rows]
-    latest_day = latest.date() if latest is not None else dt.date.today()
+    latest_day = market_day(latest) if latest is not None else market_day(now)
     complete_hours, ignored_days = select_complete_days(day_hours, latest_day)
 
     results = [

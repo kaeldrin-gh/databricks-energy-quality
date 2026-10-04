@@ -8,6 +8,8 @@ resources:
       continuous: false
       channel: CURRENT
       configuration:
+        # Timestamps are UTC; gold_daily converts to German market days itself.
+        spark.sql.session.timeZone: UTC
         landing_path: /Volumes/${var.catalog}/${resources.schemas.energy_quality.name}/landing/smard
       libraries:
         - notebook:

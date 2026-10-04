@@ -4,12 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "databricks-energy-quality"
-version = "0.2.1"
+version = "0.2.2"
 description = "Managed-lakehouse monitoring on Databricks Free Edition: SMARD prices through Unity Catalog, Delta, Lakeflow and Declarative Automation Bundles."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "requests>=2.32,<3",
+    # IANA time zones for zoneinfo on systems without them (Windows).
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]

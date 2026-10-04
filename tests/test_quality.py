@@ -12,6 +12,7 @@ from energy_quality.quality import (
     check_freshness,
     check_price_bounds,
     check_unique_keys,
+    market_day,
     select_complete_days,
 )
 from energy_quality.smard import PricePoint
@@ -130,6 +131,32 @@ def test_daily_hours_handles_dst_days():
     assert check_daily_hours([24, 20]).status == "fail"
     # Nothing to judge yet is not a failure.
     assert check_daily_hours([]).status == "ok"
+
+
+def _hours_per_market_day(start_utc: dt.datetime, hours: int) -> dict[dt.date, int]:
+    counts: dict[dt.date, int] = {}
+    for i in range(hours):
+        day = market_day(start_utc + dt.timedelta(hours=i))
+        counts[day] = counts.get(day, 0) + 1
+    return counts
+
+
+def test_market_day_uses_german_time():
+    # 22:00 UTC in summer is midnight in Berlin: already the next market day.
+    assert market_day(dt.datetime(2026, 9, 6, 21, 0)) == dt.date(2026, 9, 6)
+    assert market_day(dt.datetime(2026, 9, 6, 22, 0)) == dt.date(2026, 9, 7)
+    # In winter Berlin is UTC+1.
+    assert market_day(dt.datetime(2026, 12, 1, 23, 0, tzinfo=dt.timezone.utc)) == dt.date(
+        2026, 12, 2
+    )
+
+
+def test_market_days_have_23_and_25_hours_on_clock_changes():
+    spring = _hours_per_market_day(dt.datetime(2026, 3, 28, 23, 0), 23 + 24)
+    assert spring[dt.date(2026, 3, 29)] == 23
+    autumn = _hours_per_market_day(dt.datetime(2026, 10, 24, 22, 0), 25 + 24)
+    assert autumn[dt.date(2026, 10, 25)] == 25
+    assert check_daily_hours(list(autumn.values())).detail.endswith("1 DST day(s)")
 
 
 def test_select_complete_days_ignores_window_boundaries():
